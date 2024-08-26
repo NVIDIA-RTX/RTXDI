@@ -845,7 +845,8 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
         hitUV = payload.barycentrics;
     }
 #endif
-
+    REPORT_RAY(hitAnything);
+    
     if (o_lightIndex != RTXDI_InvalidLightIndex)
     {
         o_randXY = randomFromBarycentric(hitUVToBarycentric(hitUV));
