@@ -9,43 +9,43 @@ Version 2.3.0.
 
 **RTX** **D**ynamic **I**llumination is a framework that originally facilitated implementation of efficient direct light sampling in real-time renderers. It is based on the **ReSTIR** algorithm published in the paper called "Spatiotemporal reservoir resampling for real-time ray tracing with dynamic direct lighting" by B. Bitterli et al.
 
-Starting with version 2.0, RTXDI also includes **ReSTIR GI** functionality, which allows applications to apply importance resampling to indirect illumination rendered using path tracing. For more information about the indirect illumination algorithm, see the paper called "ReSTIR GI: Path Resampling for Real-Time Path Tracing" by Y. Ouyang et al. The feature is described in more detail in [this document](doc/RestirGI.md).
+Starting with version 2.0, RTXDI also includes **ReSTIR GI** functionality, which allows applications to apply importance resampling to indirect illumination rendered using path tracing. For more information about the indirect illumination algorithm, see the paper called "ReSTIR GI: Path Resampling for Real-Time Path Tracing" by Y. Ouyang et al. The feature is described in more detail in [this document](Doc/RestirGI.md).
 
 For more information about RTXDI, see the [NVIDIA Developer Page](https://developer.nvidia.com/rtxdi).
 
 ## Package Contents
 
-[`Libraries/Rtxdi`](https://github.com/NVIDIAGameWorks/rtxdi-runtime) is a submodule that contains the integrable runtime sources that are meant to be included in the application build:
+[`Libraries/Rtxdi`](https://github.com/NVIDIA-RTX/RTXDI-Library) is a submodule that contains the integrable runtime sources that are meant to be included in the application build:
 
-- [`Rtxdi/Include/Rtxdi`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/include/rtxdi) has the include files, both for host code and for shaders.
-- [`Rtxdi/Include/Rtxdi/DI/`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/Include/Rtxdi/DI/) and [`Rtxdi/Include/Rtxdi/GI/`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/Include/Rtxdi/GI/) are the main shader include folders that contain the resampling implementations for their respective algorithms.
-- [`Rtxdi/Source`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/Source) has the host code with various utility functions for setting up the parameters and resources for resampling.
+- [`Rtxdi/Include/Rtxdi`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Include/Rtxdi) has the include files, both for host code and for shaders.
+- [`Rtxdi/Include/Rtxdi/DI/`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Include/Rtxdi/DI) and [`Rtxdi/Include/Rtxdi/GI/`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Include/Rtxdi/GI) are the main shader include folders that contain the resampling implementations for their respective algorithms.
+- [`Rtxdi/Source`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Source) has the host code with various utility functions for setting up the parameters and resources for resampling.
 
 [`Samples`](Samples) contains two sample projects, [`MinimalSample`](Samples/MinimalSample) and [`FullSample`](Samples/FullSample). The [`MinimalSample/Source`](Samples/MinimalSample/Source) project implements ReSTIR DI in a single combined pass to show a minimum viable implementation. The [`FullSample/Source`](Samples/FullSample/Source) project implements ReSTIR DI in several passes integrated into a broader rendering pipeline to show a more standard implementation. The shaders for each project live in their respective [`MinimalSample/Shaders`](Samples/MinimalSample/Shaders) and [`FullSample/Shaders`](Samples/FullSample/Shaders) folders.
 
 [`External`](External) contains project dependencies both from Nvidia and third parties:
 
-- [`External/donut`](External/donut) is a Git submodule structure with the ["Donut" rendering framework](https://github.com/NVIDIAGameWorks/donut) used to build the sample apps.
+- `External/donut` is a Git submodule structure with the ["Donut" rendering framework](https://github.com/NVIDIA-RTX/Donut) used to build the sample apps.
 
-- [`External/NRD`](External/NRD) is a Git submodule with the ["NRD" denoiser library](https://github.com/NVIDIAGameWorks/RayTracingDenoiser).
+- `External/NRD` is a Git submodule with the ["NRD" denoiser library](https://github.com/NVIDIA-RTX/NRD).
 
-- [`External/DLSS`](External/DLSS) is a Git submodule with the [Deep Learning Super-Sampling SDK](https://github.com/NVIDIA/DLSS).
+- `External/DLSS` is a Git submodule with the [Deep Learning Super-Sampling SDK](https://github.com/NVIDIA/DLSS).
 
 - `External/dxc` is a recent version of DirectX Shader Compiler. However, unlike the other dependencies, it is not a Git submodule but is instead fetched by CMake at project configuration time.
 
-[`Assets/Media`](https://github.com/NVIDIAGameWorks/rtxdi-assets) is a Git submodule containing the [RTXDI SDK Sample Assets](https://github.com/NVIDIAGameWorks/rtxdi-assets).
+`Assets/Media` is a Git submodule containing the [RTXDI SDK Sample Assets](https://github.com/NVIDIA-RTX/RTXDI-Assets).
 
 
 ## Building and Running the Sample Apps
 
-**Note** that because the [`rtxdi-assets`](https://github.com/NVIDIAGameWorks/rtxdi-assets) submodule that is cloned into `Assets/Media` uses LFS, cloning it without [LFS](https://git-lfs.com) installed will result in files containing LFS pointers instead of the actual assets.
+**Note** that because the [`rtxdi-assets`](https://github.com/NVIDIA-RTX/RTXDI-Assets) submodule that is cloned into `Assets/Media` uses LFS, cloning it without [LFS](https://git-lfs.com) installed will result in files containing LFS pointers instead of the actual assets.
 
 ### Windows
 
 1. Install LFS support by following the instructions on [git-lfs.com](https://git-lfs.com)
 
 2. Clone the repository with all submodules:
-	- `git clone --recursive https://github.com/NVIDIAGameWorks/RTXDI.git`
+	- `git clone --recursive https://github.com/NVIDIA-RTX/RTXDI.git`
 
 	If the clone was made non-recursively and the submodules are missing, clone them separately:
 
@@ -74,7 +74,7 @@ For more information about RTXDI, see the [NVIDIA Developer Page](https://develo
 	- `sudo apt install git-lfs`
 
 3. Clone the repository with all submodules:
-	- `git clone --recursive https://github.com/NVIDIAGameWorks/RTXDI.git`
+	- `git clone --recursive https://github.com/NVIDIA-RTX/RTXDI.git`
 
 	If the clone was made non-recursively and the submodules are missing, clone them separately:
 
@@ -94,7 +94,7 @@ For more information about RTXDI, see the [NVIDIA Developer Page](https://develo
 
 ### Vulkan support
 
-The RTXDI sample applications can run using D3D12 or Vulkan, which is achieved through the [NVRHI](https://github.com/NVIDIAGameWorks/nvrhi) rendering API abstraction layer and HLSL shader compilation to SPIR-V through DXC (DirectX Shader Compiler). We deliver a compatible version of DXC through packman. If you wish to use a different (e.g. newer) version of DXC, it can be obtained from [Microsoft/DirectXShaderCompiler](https://github.com/Microsoft/DirectXShaderCompiler) on GitHub. The path to a custom version of DXC can be configured using the `DXC_PATH` and `DXC_SPIRV_PATH` CMake variables.
+The RTXDI sample applications can run using D3D12 or Vulkan, which is achieved through the [NVRHI](https://github.com/NVIDIA-RTX/NVRHI) rendering API abstraction layer and HLSL shader compilation to SPIR-V through DXC (DirectX Shader Compiler). We deliver a compatible version of DXC through packman. If you wish to use a different (e.g. newer) version of DXC, it can be obtained from [Microsoft/DirectXShaderCompiler](https://github.com/Microsoft/DirectXShaderCompiler) on GitHub. The path to a custom version of DXC can be configured using the `DXC_PATH` and `DXC_SPIRV_PATH` CMake variables.
 
 By default, the sample apps will run using D3D12 on Windows. To start them in Vulkan mode, add `--vk` to the command line. To compile the sample apps without Vulkan support, set the CMake variable `DONUT_WITH_VULKAN` to `OFF` and re-generate the project.
 
@@ -102,4 +102,4 @@ To enable SPIV-V compileation tests, set the `GLSLANG_PATH` variable in CMake to
 
 ## Integration
 
-See the [Integration Guide](doc/Integration.md).
+See the [Integration Guide](Doc/Integration.md).
