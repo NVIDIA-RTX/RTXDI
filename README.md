@@ -17,7 +17,7 @@ For more information about RTXDI, see the [NVIDIA Developer Page](https://develo
 
 [`Libraries/Rtxdi`](https://github.com/NVIDIAGameWorks/rtxdi-runtime) is a submodule that contains the integrable runtime sources that are meant to be included in the application build:
 
-- [`Rtxdi/Include/Rtxdi`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/include/rtxdi) has the include files, both for host code and for shaders.
+- [`Rtxdi/Include/Rtxdi`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Include/Rtxdi) has the include files, both for host code and for shaders.
 - [`Rtxdi/Include/Rtxdi/DI/`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/Include/Rtxdi/DI/) and [`Rtxdi/Include/Rtxdi/GI/`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/Include/Rtxdi/GI/) are the main shader include folders that contain the resampling implementations for their respective algorithms.
 - [`Rtxdi/Source`](https://github.com/NVIDIAGameWorks/rtxdi-runtime/tree/main/Source) has the host code with various utility functions for setting up the parameters and resources for resampling.
 
@@ -25,15 +25,15 @@ For more information about RTXDI, see the [NVIDIA Developer Page](https://develo
 
 [`External`](External) contains project dependencies both from Nvidia and third parties:
 
-- [`External/donut`](External/donut) is a Git submodule structure with the ["Donut" rendering framework](https://github.com/NVIDIAGameWorks/donut) used to build the sample apps.
+- `External/donut` is a Git submodule structure with the ["Donut" rendering framework](https://github.com/NVIDIA-RTX/Donut) used to build the sample apps.
 
-- [`External/NRD`](External/NRD) is a Git submodule with the ["NRD" denoiser library](https://github.com/NVIDIAGameWorks/RayTracingDenoiser).
+- `External/NRD` is a Git submodule with the ["NRD" denoiser library](https://github.com/NVIDIA-RTX/NRD).
 
-- [`External/DLSS`](External/DLSS) is a Git submodule with the [Deep Learning Super-Sampling SDK](https://github.com/NVIDIA/DLSS).
+- `External/DLSS` is a Git submodule with the [Deep Learning Super-Sampling SDK](https://github.com/NVIDIA/DLSS).
 
 - `External/dxc` is a recent version of DirectX Shader Compiler. However, unlike the other dependencies, it is not a Git submodule but is instead fetched by CMake at project configuration time.
 
-[`Assets/Media`](https://github.com/NVIDIAGameWorks/rtxdi-assets) is a Git submodule containing the [RTXDI SDK Sample Assets](https://github.com/NVIDIAGameWorks/rtxdi-assets).
+`Assets/Media` is a Git submodule containing the [RTXDI SDK Sample Assets](https://github.com/NVIDIA-RTX/RTXDI-Assets).
 
 
 ## Building and Running the Sample Apps
