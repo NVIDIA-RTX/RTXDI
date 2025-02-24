@@ -110,9 +110,9 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
     };
 
     nrd::InstanceCreationDesc instanceCreationDesc;
-    instanceCreationDesc.memoryAllocatorInterface.Allocate = NrdAllocate;
-    instanceCreationDesc.memoryAllocatorInterface.Reallocate = NrdReallocate;
-    instanceCreationDesc.memoryAllocatorInterface.Free = NrdFree;
+    instanceCreationDesc.allocationCallbacks.Allocate = NrdAllocate;
+    instanceCreationDesc.allocationCallbacks.Reallocate = NrdReallocate;
+    instanceCreationDesc.allocationCallbacks.Free = NrdFree;
     instanceCreationDesc.denoisersNum = dim(denoisers);
     instanceCreationDesc.denoisers = denoisers;
 
@@ -423,7 +423,7 @@ void NrdIntegration::RunDenoiserPasses(
                 assert(resourceIndex < dispatchDesc.resourcesNum);
                 const nrd::ResourceDesc& resource = dispatchDesc.resources[resourceIndex];
 
-                assert(resource.stateNeeded == nrdDescriptorRange.descriptorType);
+                assert(resource.descriptorType == nrdDescriptorRange.descriptorType);
 
                 nvrhi::TextureHandle texture;
                 switch (resource.type)
