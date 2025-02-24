@@ -11,8 +11,10 @@
 #ifndef SHADING_HELPERS_HLSLI
 #define SHADING_HELPERS_HLSLI
 
-#include "NRDEncoding.hlsli"
-#include "NRD.hlsli"
+#ifdef WITH_NRD
+#include <NRDEncoding.hlsli>
+#include <NRD.hlsli>
+#endif
 
 struct SplitBrdf
 {
@@ -133,7 +135,7 @@ void StoreShadingOutput(
 
         if (calcLuminance(specular) > calcLuminance(priorSpecular.rgb) || lightDistance == 0)
             specularHitT = priorSpecular.w;
-        
+
         diffuse += priorDiffuse.rgb;
         specular += priorSpecular.rgb;
     }
@@ -164,7 +166,7 @@ void StoreShadingOutput(
     {
         const bool useReLAX = (g_Const.denoiserMode == DENOISER_MODE_RELAX);
         const bool sanitize = true;
- 
+
         if (useReLAX)
         {
             u_DiffuseLighting[lightingTexturePos] = RELAX_FrontEnd_PackRadianceAndHitDist(diffuse, diffuseHitT, sanitize);
@@ -174,7 +176,7 @@ void StoreShadingOutput(
         {
             float diffNormDist = REBLUR_FrontEnd_GetNormHitDist(diffuseHitT, viewDepth, g_Const.reblurDiffHitDistParams, 1.0);
             u_DiffuseLighting[lightingTexturePos] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(diffuse, diffNormDist, sanitize);
-            
+
             float specNormDist = REBLUR_FrontEnd_GetNormHitDist(specularHitT, viewDepth, g_Const.reblurSpecHitDistParams, roughness);
             u_SpecularLighting[lightingTexturePos] = REBLUR_FrontEnd_PackRadianceAndNormHitDist(specular, specNormDist, sanitize);
         }
