@@ -21,7 +21,7 @@ elseif (UNIX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 	add_library(DLSS STATIC IMPORTED)
 
 	set(dlss_platform "Linux_x86_64")
-	set(dlss_lib "libnvidia-ngx-dlss.so.310.1")
+	set(dlss_lib "libnvidia-ngx-dlss.so.310.1.0")
 
 	set_target_properties(DLSS PROPERTIES
 		IMPORTED_LOCATION "${dlss_sdk}/lib/${dlss_platform}/libnvsdk_ngx.a"
