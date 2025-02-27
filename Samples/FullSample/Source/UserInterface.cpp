@@ -208,11 +208,11 @@ void UIData::ApplyPreset()
 void UIData::SetDefaultDenoiserSettings()
 {
     reblurSettings = nrd::ReblurSettings();
+    reblurSettings.antilagSettings.luminanceSigmaScale = 2.0f;
+    reblurSettings.antilagSettings.luminanceSensitivity = 2.0f;
     reblurSettings.enableAntiFirefly = true;
     reblurSettings.diffusePrepassBlurRadius = 30.0f;
     reblurSettings.specularPrepassBlurRadius = 30.0f;
-    reblurSettings.antilagSettings.luminanceSigmaScale = 2.0f;
-    reblurSettings.antilagSettings.luminanceSensitivity = 2.0f;
 
     relaxSettings = nrd::RelaxSettings();
     relaxSettings.diffusePhiLuminance = 1.0f;
@@ -964,7 +964,7 @@ void UserInterface::DenoiserSettings()
 
     if (ImGui_ColoredTreeNode(s, c_ColorAttentionHeader))
     {
-        ImGui::Checkbox("Enable Denoiser", &m_ui.enableDenoiser);
+        ImGui::Checkbox("Enable", &m_ui.enableDenoiser);
 
         if (m_ui.enableDenoiser)
         {
@@ -979,46 +979,30 @@ void UserInterface::DenoiserSettings()
             if (ImGui::Button("Reset Settings"))
                 m_ui.SetDefaultDenoiserSettings();
 
-            ImGui::Separator();
             ImGui::PushItemWidth(160.f);
-            ImGui::SliderFloat("Noise Mix-in", &m_ui.noiseMix, 0.f, 1.f);
-            ImGui::PopItemWidth();
-            ImGui::PushItemWidth(76.f);
-            ImGui::SliderFloat("##noiseClampLow", &m_ui.noiseClampLow, 0.f, 1.f);
-            ImGui::SameLine();
-            ImGui::SliderFloat("Noise Clamp", &m_ui.noiseClampHigh, 1.f, 4.f);
-            ImGui::PopItemWidth();
 
-            ImGui::Separator();
-            ImGui::Checkbox("Use Confidence Input", (bool*)&m_ui.lightingSettings.enableGradients);
-            if (m_ui.lightingSettings.enableGradients && m_showAdvancedDenoisingSettings)
-            {
-                ImGui::SliderFloat("Gradient Sensitivity", &m_ui.lightingSettings.gradientSensitivity, 1.f, 20.f);
-                ImGui::SliderFloat("Darkness Bias (EV)", &m_ui.lightingSettings.gradientLogDarknessBias, -16.f, -4.f);
-                ImGui::SliderFloat("Confidence History Length", &m_ui.lightingSettings.confidenceHistoryLength, 0.f, 3.f);
-            }
+            ImGui::SliderFloat("Accumulation time (sec)", &m_ui.accumulationTime, 0.0f, 1.0f, "%.2f");
+            double fps = 1.0 / GetDeviceManager()->GetAverageFrameTimeSeconds();
+
+            // Better use "accumulation time" instead of "accumulated frames", since the former is FPS independent
+            uint32_t maxAccumulatedFrameNum = nrd::GetMaxAccumulatedFrameNum(m_ui.accumulationTime, (float)fps);
+            maxAccumulatedFrameNum = std::min(maxAccumulatedFrameNum, 60u);
+
+            // ReSTIR produces ~clean signals, but using 0-1 accumulated frames for fast history is unrecommended because of disocclusions (at least)
+            uint32_t maxFastAccumulatedFrameNum = maxAccumulatedFrameNum / 10; // 10x faster "fast" history
+
+            m_ui.relaxSettings.diffuseMaxAccumulatedFrameNum = maxAccumulatedFrameNum;
+            m_ui.relaxSettings.specularMaxAccumulatedFrameNum = maxAccumulatedFrameNum;
+            m_ui.relaxSettings.diffuseMaxFastAccumulatedFrameNum = maxFastAccumulatedFrameNum;
+            m_ui.relaxSettings.specularMaxFastAccumulatedFrameNum = maxFastAccumulatedFrameNum;
+
+            m_ui.reblurSettings.maxAccumulatedFrameNum = maxAccumulatedFrameNum;
+            m_ui.reblurSettings.maxFastAccumulatedFrameNum = maxFastAccumulatedFrameNum;
 
             if (m_showAdvancedDenoisingSettings)
             {
-                ImGui::Separator();
-                ImGui::PushItemWidth(160.f);
-
-                ImGui::SliderFloat("Accumulation time (sec)", &m_ui.accumulationTime, 0.0f, 1.0f, "%.2f");
-                double fps = 1.0 / GetDeviceManager()->GetAverageFrameTimeSeconds();
-
-                // Better use "accumulation time" instead of "accumulated frames", since the former is FPS independent
-                uint32_t maxAccumulatedFrameNum = nrd::GetMaxAccumulatedFrameNum(m_ui.accumulationTime, (float)fps);
-
-                // ReSTIR produces ~clean signals, but using 0-1 accumulated frames for fast history is unrecommended because of disocclusions (at least)
-                uint32_t maxFastAccumulatedFrameNum = maxAccumulatedFrameNum / 10; // 10x faster "fast" history
-
                 if (useReLAX)
                 {
-                    m_ui.relaxSettings.diffuseMaxAccumulatedFrameNum = maxAccumulatedFrameNum;
-                    m_ui.relaxSettings.specularMaxAccumulatedFrameNum = maxAccumulatedFrameNum;
-                    m_ui.relaxSettings.diffuseMaxFastAccumulatedFrameNum = maxFastAccumulatedFrameNum;
-                    m_ui.relaxSettings.specularMaxFastAccumulatedFrameNum = maxFastAccumulatedFrameNum;
-
                     ImGui::Checkbox("Anti-firefly", &m_ui.relaxSettings.enableAntiFirefly);
                     ImGui::SameLine();
                     ImGui::Checkbox("Roughness edge stopping", &m_ui.relaxSettings.enableRoughnessEdgeStopping);
@@ -1049,9 +1033,6 @@ void UserInterface::DenoiserSettings()
                 }
                 else
                 {
-                    m_ui.reblurSettings.maxAccumulatedFrameNum = maxAccumulatedFrameNum;
-                    m_ui.reblurSettings.maxFastAccumulatedFrameNum = maxFastAccumulatedFrameNum;
-
                     // Temporal stabilization is optional for ReSTIR
                     m_ui.reblurSettings.maxStabilizedFrameNum = std::min(m_ui.reblurSettings.maxStabilizedFrameNum, maxAccumulatedFrameNum);
                     ImGui::SliderInt("Stabilization (frames)", (int*)&m_ui.reblurSettings.maxStabilizedFrameNum, 0, maxAccumulatedFrameNum, "%d");
@@ -1078,6 +1059,27 @@ void UserInterface::DenoiserSettings()
                 }
 
                 ImGui::PopItemWidth();
+            }
+
+            // Noise mix in
+            ImGui::Separator();
+            ImGui::PushItemWidth(160.f);
+            ImGui::SliderFloat("Noise Mix-in", &m_ui.noiseMix, 0.f, 1.f);
+            ImGui::PopItemWidth();
+            ImGui::PushItemWidth(76.f);
+            ImGui::SliderFloat("##noiseClampLow", &m_ui.noiseClampLow, 0.f, 1.f);
+            ImGui::SameLine();
+            ImGui::SliderFloat("Noise Clamp", &m_ui.noiseClampHigh, 1.f, 4.f);
+            ImGui::PopItemWidth();
+
+            // Confidence
+            ImGui::Separator();
+            ImGui::Checkbox("Use Confidence Input", (bool*)&m_ui.lightingSettings.enableGradients);
+            if (m_ui.lightingSettings.enableGradients && m_showAdvancedDenoisingSettings)
+            {
+                ImGui::SliderFloat("Gradient Sensitivity", &m_ui.lightingSettings.gradientSensitivity, 1.f, 20.f);
+                ImGui::SliderFloat("Darkness Bias (EV)", &m_ui.lightingSettings.gradientLogDarknessBias, -16.f, -4.f);
+                ImGui::SliderFloat("Confidence History Length", &m_ui.lightingSettings.confidenceHistoryLength, 0.f, 3.f);
             }
         }
 
