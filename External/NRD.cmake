@@ -9,7 +9,4 @@ if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/NRD/CMakeLists.txt")
 	option(NRD_STATIC_LIBRARY "" ON)
 
 	add_subdirectory(external/NRD)
-	
-	set_target_properties(NRD PROPERTIES FOLDER NRD)
-	set_target_properties(NRD_Shaders PROPERTIES FOLDER NRD)
 endif()

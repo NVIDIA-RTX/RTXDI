@@ -442,10 +442,7 @@ void LightingPasses::FillResamplingConstants(
     constants.visualizeRegirCells = lightingSettings.visualizeRegirCells;
 #if WITH_NRD
     if (lightingSettings.denoiserMode != DENOISER_MODE_OFF)
-    {
-        NrdHitDistanceParamsToFloat4(lightingSettings.reblurDiffHitDistanceParams, constants.reblurDiffHitDistParams);
-        NrdHitDistanceParamsToFloat4(lightingSettings.reblurSpecHitDistanceParams, constants.reblurSpecHitDistParams);
-    }
+        NrdHitDistanceParamsToFloat4(lightingSettings.reblurHitDistanceParams, constants.reblurHitDistParams);
 #endif
 
     constants.lightBufferParams = isContext.GetLightBufferParameters();

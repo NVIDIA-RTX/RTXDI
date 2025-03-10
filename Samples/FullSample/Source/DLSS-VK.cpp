@@ -48,7 +48,7 @@ public:
         featureCommonInfo.LoggingInfo.DisableOtherLoggingSinks = true;
 
         NVSDK_NGX_Result result = NVSDK_NGX_VULKAN_Init(c_applicationID,
-            executablePathW.c_str(), vkInstance, vkPhysicalDevice, vkDevice, &featureCommonInfo);
+            executablePathW.c_str(), vkInstance, vkPhysicalDevice, vkDevice, nullptr, nullptr, &featureCommonInfo);
 
         if (result != NVSDK_NGX_Result_Success)
         {
@@ -220,7 +220,8 @@ public:
             m_parameters = nullptr;
         }
 
-        NVSDK_NGX_VULKAN_Shutdown();
+        VkDevice vkDevice = m_device->getNativeObject(nvrhi::ObjectTypes::VK_Device);
+        NVSDK_NGX_VULKAN_Shutdown1(vkDevice);
     }
 };
 
