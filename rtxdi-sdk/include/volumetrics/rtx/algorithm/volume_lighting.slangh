@@ -212,11 +212,12 @@ float3 calcAtmosphereAttenuation(
 }
 
 // Calculates a volumetric density modulation factor between two points based on a configurable noise function.
-// The start and end positions must be in the same translated world space as the volume camera passed in, or world
-// space if no camera is passed in.
+// The start and end positions must be in the same translated world space as the volume camera passed in, not world
+// space (as this function does not allow an optional camera unlike others as it is not called between code using
+// both translated world and standard world space, though it could be extended to support that in the future if needed).
 float sampleDensityField(
   const VolumeArgs volumeArgs,
-  const Optional<VolumeDefinitionCamera> camera,
+  const VolumeDefinitionCamera camera,
   float3 from, float3 to, float distance, const float timeMS
 )
 {
@@ -227,10 +228,17 @@ float sampleDensityField(
     return atmosphericDensity;
   }
 
+  // Convert the to/from positions from translated world space to world space
+  // Note: This is done as the noise pattern should remain fixed relative to world space, rather than translated world space
+  // which moves with the camera. This may mean the noise function may break down at large position magnitudes due to a lack of
+  // precision, but until that becomes a problem this approach works fine.
+  const float3 worldspaceFrom = translatedWorldToWorld(camera, from);
+  const float3 worldspaceTo = translatedWorldToWorld(camera, to);
+
   // Clamped to prevent severe performance cliff
   const uint numSubSteps = clamp(distance / volumeArgs.noiseFieldSubStepSize, 1, 10);
-  const float3 posStep = (to - from) / numSubSteps;
-  float3 pos = from;
+  const float3 posStep = (worldspaceTo - worldspaceFrom) / numSubSteps;
+  float3 pos = worldspaceFrom;
   // Note: when volumeArgs.noiseFieldTimeScale is 0, this will set the time to a constant 0 which
   // will effectively disable temporal modulation of the noise, which is intended.
   const float time = (timeMS / 1000.0f) * volumeArgs.noiseFieldTimeScale;

@@ -175,8 +175,8 @@ void integrateVolumetricNEE(
     const float density = sampleDensityField(
       volumeArgs,
       camera,
-      previousTranslatedWorldPosition + camera.translatedWorldOffset,
-      currentTranslatedWorldPosition + camera.translatedWorldOffset,
+      previousTranslatedWorldPosition,
+      currentTranslatedWorldPosition,
       stepSize,
       timeMS
     ); 
