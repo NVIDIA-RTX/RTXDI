@@ -101,7 +101,7 @@ void integrateVolume(
   // Read information from the previous frame for accumulation based on a reprojected froxel coordinate
 
   const bool reprojectionValid = all(previousFroxelUVW > vec3(0.0f, 0.0f, 0.0f) && previousFroxelUVW < vec3(1.0f, 1.0f, 1.0f));
-  SphericalHarmonic oldRadianceSH = (SphericalHarmonic)0;
+  SphericalHarmonic oldRadianceSH = SphericalHarmonic();
   // Note: Default age is 0 when reprojection fails to reset history.
   float newHistoryAge = 0.0f;
   // Note: Default to 1.0 when reprojection fails to always favor new data coming in.
@@ -145,7 +145,7 @@ void integrateVolume(
 
   // Perform NEE on the final Reservoir
 
-  SphericalHarmonic radianceSH = (SphericalHarmonic)0;
+  SphericalHarmonic radianceSH = SphericalHarmonic();
   
   // Select and sample from a light for NEE via the Reservoir
   RAB_VolumeInteraction rabVolumeInteraction;

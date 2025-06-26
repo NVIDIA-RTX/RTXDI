@@ -271,7 +271,7 @@ struct VolumeReSTIR_LightCandidateSample
   VolumeReSTIR_LightSample lightSample;
   // Note: The inverse of the PDF this candidate sample was generated with (which typically will not be the same distribution
   // as the target PDF). Inverse done simply to avoid a division later.
-  float inverseSourcePdf;
+  float inverseSourcePdf = 0.f;
 
   static VolumeReSTIR_LightCandidateSample create(VolumeReSTIR_LightSample lightSample, float inverseSourcePdf)
   {
