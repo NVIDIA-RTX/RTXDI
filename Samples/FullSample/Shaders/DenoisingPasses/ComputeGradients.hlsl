@@ -14,9 +14,7 @@
 
 #include "Rtxdi/DI/Reservoir.hlsli"
 
-#ifdef WITH_NRD
 #undef WITH_NRD
-#endif
 
 #include "../LightingPasses/ShadingHelpers.hlsli"
 
@@ -42,7 +40,7 @@ void RayGen()
     int2 selectedPixelPos = -1;
     int2 selectedPrevPixelPos = -1;
     float2 selectedDiffSpecLum = 0;
-    
+
     // Iterate over all the pixels in the stratum, find one that is likely to produce
     // the brightest gradient. That means the pixel that has the brightest color coming
     // purely from light sampling in either the current or the previous frame.
@@ -64,10 +62,10 @@ void RayGen()
         // Load the previous frame sampled lighting luminance.
         // For invalid gradients, temporalPixelPos is negative, and prevLuminance will be 0
         float2 prevLuminance = t_PrevRestirLuminance[temporalReservoirPos];
-        
+
         // Load the current frame sampled lighting luminance.
         float2 currLuminance = u_RestirLuminance[srcReservoirPos];
-        
+
         float currMaxLuminance = max(currLuminance.x, currLuminance.y);
         float prevMaxLuminance = max(prevLuminance.x, prevLuminance.y);
         float selectedMaxLuminance = max(selectedDiffSpecLum.x, selectedDiffSpecLum.y);
@@ -107,7 +105,7 @@ void RayGen()
 
         // Map the reservoir's light index into the other frame (previous or current)
         int selectedMappedLightIndex = RAB_TranslateLightIndex(RTXDI_GetDIReservoirLightIndex(selectedReservoir), !usePrevSample);
-        
+
         if (selectedMappedLightIndex >= 0)
         {
             // If the mapping was successful, compare the lighting.
@@ -154,7 +152,7 @@ void RayGen()
             // Calculate the sampled lighting luminance for the other surface
             float2 newDiffSpecLum = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
 
-            // Convert to FP16 and back to avoid false-positive gradients due to precision loss in the 
+            // Convert to FP16 and back to avoid false-positive gradients due to precision loss in the
             // u_RestirLuminance and t_PrevRestirLuminance textures where selectedDiffSpecLum comes from.
             newDiffSpecLum = f16tof32(f32tof16(newDiffSpecLum));
 

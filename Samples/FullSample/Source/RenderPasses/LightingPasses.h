@@ -77,8 +77,7 @@ public:
         BRDFPathTracing_Parameters brdfptParams = GetDefaultBRDFPathTracingParams();
         
 #if WITH_NRD
-        const nrd::HitDistanceParameters* reblurDiffHitDistanceParams = nullptr;
-        const nrd::HitDistanceParameters* reblurSpecHitDistanceParams = nullptr;
+        const nrd::HitDistanceParameters* reblurHitDistanceParams = nullptr;
 #endif
     };
 

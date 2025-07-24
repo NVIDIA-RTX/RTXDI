@@ -73,7 +73,7 @@ add_custom_target(${shaders_target}
     SOURCES ${shaders} Shaders.cfg)
 
 if(TARGET NRD)
-   set(NRD_OPTIONS -I "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/NRD/Shaders/Include" -D WITH_NRD -D NRD_USE_OCT_NORMAL_ENCODING=0 -D NRD_USE_MATERIAL_ID=0)
+   set(NRD_OPTIONS -I "${CMAKE_CURRENT_SOURCE_DIR}/../../../external/NRD/Shaders/Include" -D WITH_NRD)
 else()
    set(NRD_OPTIONS --relaxedInclude NRD.hlsli)
 endif()
@@ -87,7 +87,7 @@ set (OUTPUT_PATH_BASE "${CMAKE_BINARY_DIR}/bin/shaders/full-sample")
  endif()
 
 if (DONUT_WITH_DX12)
-   set(DX12_COMPILER_OPTIONS 
+   set(DX12_COMPILER_OPTIONS
       --platform DXIL
       --shaderModel 6_5
       --binaryBlob
@@ -130,4 +130,4 @@ if (DONUT_WITH_VULKAN)
 endif()
 
 set_target_properties(${shaders_target} PROPERTIES FOLDER ${folder})
-set_source_files_properties(${shaders} PROPERTIES VS_TOOL_OVERRIDE "None") 
+set_source_files_properties(${shaders} PROPERTIES VS_TOOL_OVERRIDE "None")

@@ -189,7 +189,8 @@ public:
             m_parameters = nullptr;
         }
 
-        NVSDK_NGX_D3D12_Shutdown();
+        ID3D12Device* d3ddevice = m_device->getNativeObject(nvrhi::ObjectTypes::D3D12_Device);
+        NVSDK_NGX_D3D12_Shutdown1(d3ddevice);
     }
 };
 
