@@ -16,6 +16,12 @@
 #include <Rtxdi/GI/Reservoir.hlsli>
 #include <Rtxdi/Utils/ReservoirAddressing.hlsli>
 
+#ifdef WITH_NRD
+#define NRD_HEADER_ONLY
+#include <NRDEncoding.hlsli>
+#include <NRD.hlsli>
+#endif
+
 #include "../ShadingHelpers.hlsli"
 
 static const float kMaxBrdfValue = 1e4;
@@ -41,7 +47,7 @@ RTXDI_GIReservoir LoadInitialSampleReservoir(int2 reservoirPosition, RAB_Surface
     const float3 normal = octToNdirUnorm32(secondaryGBufferData.normal);
     const float3 throughput = Unpack_R16G16B16A16_FLOAT(secondaryGBufferData.throughputAndFlags).rgb;
 
-    // Note: the secondaryGBufferData.emission field contains the sampled radiance saved in ShadeSecondarySurfaces
+    // Note: the secondaryGBufferData.emission field contains the sampled radiance saved in ShadeSecondarySurfaces 
     return RTXDI_MakeGIReservoir(secondaryGBufferData.worldPos,
         normal, secondaryGBufferData.emission * throughput, secondaryGBufferData.pdf);
 }
@@ -63,10 +69,10 @@ void RayGen()
         return;
 
     const RAB_Surface primarySurface = RAB_GetGBufferSurface(pixelPosition, false);
-
+    
     const uint2 reservoirPosition = RTXDI_PixelPosToReservoirPos(pixelPosition, g_Const.runtimeParams.activeCheckerboardField);
     const RTXDI_GIReservoir reservoir = RTXDI_LoadGIReservoir(g_Const.restirGI.reservoirBufferParams, reservoirPosition, g_Const.restirGI.bufferIndices.secondarySurfaceReSTIRDIOutputBufferIndex);
-
+    
     float3 diffuse = 0;
     float3 specular = 0;
 
@@ -100,10 +106,10 @@ void RayGen()
 
             const float3 initialRadiance = initialReservoir.radiance * initialReservoir.weightSum;
 
-            diffuse = brdf.demodulatedDiffuse * radiance * finalWeight
+            diffuse = brdf.demodulatedDiffuse * radiance * finalWeight 
                     + brdf0.demodulatedDiffuse * initialRadiance * initialWeight;
 
-            specular = brdf.specular * radiance * finalWeight
+            specular = brdf.specular * radiance * finalWeight 
                      + brdf0.specular * initialRadiance * initialWeight;
         }
         else
@@ -116,6 +122,6 @@ void RayGen()
         specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
     }
 
-    StoreShadingOutput(GlobalIndex, pixelPosition,
+    StoreShadingOutput(GlobalIndex, pixelPosition, 
         primarySurface.viewDepth, primarySurface.material.roughness, diffuse, specular, 0, false, true);
 }

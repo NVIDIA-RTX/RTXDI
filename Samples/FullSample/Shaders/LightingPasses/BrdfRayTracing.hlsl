@@ -14,6 +14,12 @@
 
 #include <Rtxdi/DI/Reservoir.hlsli>
 
+#ifdef WITH_NRD
+#define NRD_HEADER_ONLY
+#include <NRDEncoding.hlsli>
+#include <NRD.hlsli>
+#endif
+
 #include "ShadingHelpers.hlsli"
 
 static const float c_MaxIndirectRadiance = 10;
@@ -37,7 +43,7 @@ void RayGen()
         return;
 
     RAB_RandomSamplerState rng = RAB_InitRandomSampler(GlobalIndex, 5);
-
+    
     float3 tangent, bitangent;
     branchlessONB(surface.normal, tangent, bitangent);
 
@@ -116,13 +122,13 @@ void RayGen()
     ray.Origin = surface.worldPos;
 
     float3 radiance = 0;
-
+    
     RayPayload payload = (RayPayload)0;
     payload.instanceID = ~0u;
     payload.throughput = 1.0;
 
     uint instanceMask = INSTANCE_MASK_OPAQUE;
-
+    
     if (g_Const.sceneConstants.enableAlphaTestedGeometry)
         instanceMask |= INSTANCE_MASK_ALPHA_TESTED;
 
@@ -131,7 +137,7 @@ void RayGen()
 
 #if USE_RAY_QUERY
     RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
-
+    
     rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, instanceMask, ray);
 
     while (rayQuery.Proceed())
@@ -168,8 +174,8 @@ void RayGen()
     }
 
     uint gbufferIndex = RTXDI_ReservoirPositionToPointer(g_Const.restirGI.reservoirBufferParams, GlobalIndex, 0);
-
-    struct
+    
+    struct 
     {
         float3 position;
         float3 normal;
@@ -198,7 +204,7 @@ void RayGen()
             payload.barycentrics,
             GeomAttr_Normal | GeomAttr_TexCoord | GeomAttr_Position,
             t_InstanceData, t_GeometryData, t_MaterialConstants);
-
+        
         MaterialSample ms = sampleGeometryMaterial(gs, 0, 0, 0,
             MatAttr_BaseColor | MatAttr_Emissive | MatAttr_MetalRough, s_MaterialSampler);
 
@@ -267,10 +273,10 @@ void RayGen()
             // GI reservoir sample in ShadeSecondarySurface.hlsl. It need to be stored separately.
             secondaryGBufferData.emission = radiance;
             radiance = 0;
-
+            
             secondaryGBufferData.pdf = overall_PDF;
         }
-
+        
         uint flags = 0;
         if (isSpecularRay) flags |= kSecondaryGBuffer_IsSpecularRay;
         if (isDeltaSurface) flags |= kSecondaryGBuffer_IsDeltaSurface;

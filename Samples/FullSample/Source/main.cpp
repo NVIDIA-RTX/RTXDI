@@ -1114,7 +1114,8 @@ public:
         lightingSettings.enableAlphaTestedGeometry = m_ui.gbufferSettings.enableAlphaTestedGeometry;
         lightingSettings.enableTransparentGeometry = m_ui.gbufferSettings.enableTransparentGeometry;
 #if WITH_NRD
-        lightingSettings.reblurHitDistanceParams = &m_ui.reblurSettings.hitDistanceParameters;
+        lightingSettings.reblurDiffHitDistanceParams = &m_ui.reblurSettings.hitDistanceParameters;
+        lightingSettings.reblurSpecHitDistanceParams = &m_ui.reblurSettings.hitDistanceParameters;
         lightingSettings.denoiserMode = denoiserMode;
 #else
         lightingSettings.denoiserMode = DENOISER_MODE_OFF;

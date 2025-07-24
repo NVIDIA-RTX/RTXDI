@@ -24,6 +24,12 @@
 #include "Rtxdi/ReGIR/ReGIRSampling.hlsli"
 #endif
 
+#ifdef WITH_NRD
+#define NRD_HEADER_ONLY
+#include <NRDEncoding.hlsli>
+#include <NRD.hlsli>
+#endif
+
 #include "../ShadingHelpers.hlsli"
 
 #if USE_RAY_QUERY
@@ -126,7 +132,7 @@ void RayGen()
             /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
 
         currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
-
+        
         specular = DemodulateSpecular(surface.material.specularF0, specular);
     }
 
@@ -143,6 +149,6 @@ void RayGen()
     }
 #endif
 
-    StoreShadingOutput(GlobalIndex, pixelPosition,
+    StoreShadingOutput(GlobalIndex, pixelPosition, 
         surface.viewDepth, surface.material.roughness,  diffuse, specular, lightDistance, true, g_Const.restirDI.shadingParams.enableDenoiserInputPacking);
 }

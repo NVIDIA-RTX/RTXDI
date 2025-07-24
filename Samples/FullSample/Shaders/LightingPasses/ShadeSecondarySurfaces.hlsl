@@ -20,6 +20,12 @@
 #include <Rtxdi/DI/SpatialResampling.hlsli>
 #include <Rtxdi/GI/Reservoir.hlsli>
 
+#ifdef WITH_NRD
+#define NRD_HEADER_ONLY
+#include <NRDEncoding.hlsli>
+#include <NRD.hlsli>
+#endif
+
 #include "ShadingHelpers.hlsli"
 
 static const float c_MaxIndirectRadiance = 10;
@@ -80,7 +86,7 @@ void RayGen()
             g_Const.brdfPT.secondarySurfaceReSTIRDIParams.initialSamplingParams.numPrimaryInfiniteLightSamples,
             g_Const.brdfPT.secondarySurfaceReSTIRDIParams.initialSamplingParams.numPrimaryEnvironmentSamples,
             0,      // numBrdfSamples
-            0.f,    // brdfCutoff
+            0.f,    // brdfCutoff 
             0.f);   // brdfMinRayT
 
         RAB_LightSample lightSample;
@@ -168,7 +174,7 @@ void RayGen()
 
         specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
 
-        StoreShadingOutput(GlobalIndex, pixelPosition,
+        StoreShadingOutput(GlobalIndex, pixelPosition, 
             primarySurface.viewDepth, primarySurface.material.roughness, diffuse, specular, 0, false, true);
     }
 }

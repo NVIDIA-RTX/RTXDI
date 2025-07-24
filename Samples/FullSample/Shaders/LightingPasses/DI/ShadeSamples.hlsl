@@ -18,6 +18,12 @@
 #include "Rtxdi/ReGIR/ReGIRSampling.hlsli"
 #endif
 
+#ifdef WITH_NRD
+#define NRD_HEADER_ONLY
+#include <NRDEncoding.hlsli>
+#include <NRD.hlsli>
+#endif
+
 #include "../ShadingHelpers.hlsli"
 
 #if USE_RAY_QUERY
@@ -54,9 +60,9 @@ void RayGen()
 
         bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
             /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
-
+    
         currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
-
+    
         specular = DemodulateSpecular(surface.material.specularF0, specular);
 
         if (needToStore)
@@ -68,7 +74,7 @@ void RayGen()
     // Store the sampled lighting luminance for the gradient pass.
     // Discard the pixels where the visibility was reused, as gradients need actual visibility.
     u_RestirLuminance[GlobalIndex] = currLuminance * (reservoir.age > 0 ? 0 : 1);
-
+    
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
     if (g_Const.visualizeRegirCells)
     {
@@ -76,6 +82,6 @@ void RayGen()
     }
 #endif
 
-    StoreShadingOutput(GlobalIndex, pixelPosition,
+    StoreShadingOutput(GlobalIndex, pixelPosition, 
         surface.viewDepth, surface.material.roughness, diffuse, specular, lightDistance, true, g_Const.restirDI.shadingParams.enableDenoiserInputPacking);
 }

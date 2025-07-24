@@ -15,6 +15,7 @@
 #include "GBufferHelpers.hlsli"
 
 #ifdef WITH_NRD
+#define NRD_HEADER_ONLY
 #include <NRDEncoding.hlsli>
 #include <NRD.hlsli>
 #endif
@@ -70,7 +71,7 @@ void main(uint2 globalIdx : SV_DispatchThreadID)
             {
                 denoised_diffuse = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(denoised_diffuse);
                 denoised_specular = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(denoised_specular);
-
+                
                 diffuse_illumination = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(diffuse_illumination);
                 specular_illumination = REBLUR_BackEnd_UnpackRadianceAndNormHitDist(specular_illumination);
             }
@@ -96,7 +97,7 @@ void main(uint2 globalIdx : SV_DispatchThreadID)
         compositedColor += emissive.rgb;
     }
     else
-    {
+    {   
         RayDesc primaryRay = setupPrimaryRay(globalIdx, g_Const.view);
 
         if (g_Const.enableEnvironmentMap)

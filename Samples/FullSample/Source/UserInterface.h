@@ -145,11 +145,10 @@ struct UIData
     bool environmentMapImportanceSampling = true;
     float environmentIntensityBias = 0.f;
     float environmentRotation = 0.f;
-
+    
     bool enableDenoiser = true;
 #ifdef WITH_NRD
     float debug = 0.0f;
-    float accumulationTime = 0.334f; // (sec) 20 frames @ 60 FPS
     nrd::Denoiser denoisingMethod = nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
     nrd::ReblurSettings reblurSettings = {};
     nrd::RelaxSettings relaxSettings = {};

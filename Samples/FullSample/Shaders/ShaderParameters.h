@@ -211,7 +211,8 @@ struct ResamplingConstants
     PlanarViewConstants prevView;
     RTXDI_RuntimeParameters runtimeParams;
     
-    float4 reblurHitDistParams;
+    float4 reblurDiffHitDistParams;
+    float4 reblurSpecHitDistParams;
 
     uint frameIndex;
     uint enablePreviousTLAS;
