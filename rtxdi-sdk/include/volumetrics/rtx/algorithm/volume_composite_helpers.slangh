@@ -203,7 +203,12 @@ void integrateVolumetricNEE(
   // Since volumetrics are only calculated for a fraction of the frustum volume, we need to calculate the remaining attenuation assuming homogonous media
   // starting at the last translated world position the integration steps ended on (previousTranslatedWorldPosition).
   // This handles both the large hit distance case, and the miss case which do require separate solutions.
-  const float planeDistance = dot(targetPositionTranslated, transpose(camera.translatedWorldToView)[2].xyz);
+  
+  // Calculate the actual hit position for correct plane distance calculation
+  const float3 actualTargetPosition = viewDir * hitDistance + startPosition;
+  const float3 actualTargetPositionTranslated = worldToTranslatedWorld(camera, actualTargetPosition);
+  const float planeDistance = dot(actualTargetPositionTranslated, transpose(camera.translatedWorldToView)[2].xyz);
+  
   if (primaryMiss)
   {
     accumulatedTransmittance = calcVolumetricAttenuation(volumeArgs, camera, true, 0.f, previousTranslatedWorldPosition, viewDir);
