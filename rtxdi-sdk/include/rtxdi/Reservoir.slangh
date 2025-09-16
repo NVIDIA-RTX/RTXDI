@@ -18,6 +18,9 @@
 #define RTXDI_MAX_PORTAL_COUNT 2
 #define RESTIR_GI_FLAG_OCCLUDED_SAMPLE (0x1 << 29)
 #define RESTIR_GI_INVALID_INDIRECT_LIGHT_PORTAL_ID 0x2
+// Note: Clamped to a value slightly lower than the float16 maximum to avoid infinities when storing
+// values into the reservoir.
+#define RESTIR_GI_MAX_VIRTUAL_FRACTION (65000.0f)
 
 struct RTXDI_Reservoir
 {
@@ -169,7 +172,7 @@ struct ReSTIRGI_Reservoir
 
   [mutating] void setVirtualFraction(float invalidLength)
   {
-    flagsAndVirtualFraction = (flagsAndVirtualFraction & 0xffff0000) | f32tof16(invalidLength);
+    flagsAndVirtualFraction = (flagsAndVirtualFraction & 0xffff0000) | f32tof16(min(invalidLength, RESTIR_GI_MAX_VIRTUAL_FRACTION));
   }
 
   float3 getVisibilityPoint(float3 srcPoint)
