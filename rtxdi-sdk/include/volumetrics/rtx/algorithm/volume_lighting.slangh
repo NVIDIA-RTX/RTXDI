@@ -67,8 +67,9 @@ float3 calcVolumetricAttenuation(
   if (!volumeArgs.enableAtmosphere)
   {
     // Infinite Medium Attenuation
-
-    const float attenuationT = infinitelyDistant ? volumeArgs.maxAttenuationDistanceForNoAtmosphere : min(volumeArgs.maxAttenuationDistanceForNoAtmosphere, hitDistance);
+    // Use actual hit distance for physically correct attenuation
+    // For infinite rays, use a large but finite distance for numerical stability
+    const float attenuationT = infinitelyDistant ? volumeArgs.maxAttenuationDistanceForNoAtmosphere : hitDistance;
 
     return evalBeerLambertAttenuation(volumeArgs.attenuationCoefficient * attenuationScalar, attenuationT);
   }
