@@ -1018,8 +1018,7 @@ void UserInterface::DenoiserSettings()
                     ImGui::SliderFloat2("Pre-pass blur radius (px)", &m_ui.relaxSettings.diffusePrepassBlurRadius, 0.0f, 50.0f, "%.1f");
                     ImGui::SliderInt("A-trous iterations", (int32_t*)&m_ui.relaxSettings.atrousIterationNum, 2, 8);
                     ImGui::SliderFloat2("Diff-Spec luma weight", &m_ui.relaxSettings.diffusePhiLuminance, 0.0f, 10.0f, "%.1f");
-                    ImGui::SetNextItemWidth( ImGui::CalcItemWidth() * 0.9f );
-                    ImGui::SliderFloat3("Diff-Spec-Rough fraction", &m_ui.relaxSettings.diffuseLobeAngleFraction, 0.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("Lobe fraction", &m_ui.relaxSettings.lobeAngleFraction, 0.0f, 1.0f, "%.2f");
                     ImGui::SetNextItemWidth( ImGui::CalcItemWidth() * 0.9f );
                     ImGui::SliderFloat3("Luma-Normal-Rough relaxation", &m_ui.relaxSettings.luminanceEdgeStoppingRelaxation, 0.0f, 1.0f, "%.2f");
                     ImGui::SliderFloat("Spec lobe angle slack", &m_ui.relaxSettings.specularLobeAngleSlack, 0.0f, 89.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
@@ -1044,18 +1043,19 @@ void UserInterface::DenoiserSettings()
 
                     ImGui::Text("Spatial filering:");
                     ImGui::SliderFloat2("Pre-pass blur radius (px)", &m_ui.reblurSettings.diffusePrepassBlurRadius, 0.0f, 50.0f, "%.1f");
-                    ImGui::SliderFloat("Blur base radius (px)", &m_ui.reblurSettings.blurRadius, 0.0f, 60.0f, "%.1f");
+                    ImGui::SliderFloat("Max blur radius (px)", &m_ui.reblurSettings.maxBlurRadius, 0.0f, 30.0f, "%.1f");
                     ImGui::SliderFloat("Lobe fraction", &m_ui.reblurSettings.lobeAngleFraction, 0.0f, 1.0f, "%.2f");
                     ImGui::SliderFloat("Roughness fraction", &m_ui.reblurSettings.roughnessFraction, 0.0f, 1.0f, "%.2f");
-                    ImGui::SliderFloat("Stabilization strength", &m_ui.reblurSettings.stabilizationStrength, 0.0f, 1.0f, "%.2f");
+                    m_ui.reblurSettings.maxStabilizedFrameNum = std::min(m_ui.reblurSettings.maxStabilizedFrameNum, m_ui.reblurSettings.maxAccumulatedFrameNum);
+                    ImGui::SliderInt("Stabilization (frames)", (int*)&m_ui.reblurSettings.maxStabilizedFrameNum, 0, m_ui.reblurSettings.maxAccumulatedFrameNum);
                     ImGui::SetNextItemWidth( ImGui::CalcItemWidth() * 0.6f );
                     ImGui::SliderFloat("Responsive accum roughness threshold", &m_ui.reblurSettings.responsiveAccumulationRoughnessThreshold, 0.0f, 1.0f, "%.2f");
 
-                    if (m_ui.reblurSettings.stabilizationStrength != 0.0f)
+                    if (m_ui.reblurSettings.maxAccumulatedFrameNum && m_ui.reblurSettings.maxStabilizedFrameNum)
                     {
                         ImGui::Text("Anti-lag:");
-                        ImGui::SliderFloat2("Sigma scale", &m_ui.reblurSettings.antilagSettings.luminanceSigmaScale, 1.0f, 3.0f, "%.1f");
-                        ImGui::SliderFloat2("Power", &m_ui.reblurSettings.antilagSettings.luminanceAntilagPower, 0.01f, 1.0f, "%.2f");
+                        ImGui::SliderFloat("Sigma scale", &m_ui.reblurSettings.antilagSettings.luminanceSigmaScale, 1.0f, 5.0f, "%.1f");
+                        ImGui::SliderFloat("Sensitivity", &m_ui.reblurSettings.antilagSettings.luminanceSensitivity, 1.0f, 5.0f, "%.2f");
                     }
                 }
 

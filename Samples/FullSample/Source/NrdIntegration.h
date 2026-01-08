@@ -54,10 +54,11 @@ private:
     struct NrdPipeline
     {
         nvrhi::ShaderHandle Shader;
-        nvrhi::BindingLayoutHandle BindingLayout;
+        nvrhi::BindingLayoutHandle BindingLayout0;
         nvrhi::ComputePipelineHandle Pipeline;
     };
 
+    nvrhi::BindingLayoutHandle BindingLayout1;
     nvrhi::BufferHandle m_constantBuffer;
     std::vector<NrdPipeline> m_pipelines;
     std::vector<nvrhi::SamplerHandle> m_samplers;
