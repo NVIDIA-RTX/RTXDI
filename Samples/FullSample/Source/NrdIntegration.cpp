@@ -103,7 +103,7 @@ NrdIntegration::NrdIntegration(nvrhi::IDevice* device, nrd::Denoiser denoiser)
 
 bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
 {
-    const nrd::LibraryDesc& libraryDesc = nrd::GetLibraryDesc();
+    const nrd::LibraryDesc* libraryDesc = nrd::GetLibraryDesc();
 
     const nrd::DenoiserDesc denoisers[] = {
         { ID, m_denoiser }
@@ -121,21 +121,21 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
     if (res != nrd::Result::SUCCESS)
         return false;
 
-    const nrd::InstanceDesc& instanceDesc = nrd::GetInstanceDesc(*m_instance);
+    const nrd::InstanceDesc* instanceDesc = nrd::GetInstanceDesc(*m_instance);
     const bool isVulkan = m_device->getGraphicsAPI() == nvrhi::GraphicsAPI::VULKAN;
 
     
     const nvrhi::BufferDesc constantBufferDesc = nvrhi::utils::CreateVolatileConstantBufferDesc(
-        instanceDesc.constantBufferMaxDataSize,
+        instanceDesc->constantBufferMaxDataSize,
         "NrdConstantBuffer",
-        instanceDesc.descriptorPoolDesc.totalConstantBuffersNum * 4);
+        instanceDesc->descriptorPoolDesc.setsMaxNum * 4);
 
     m_constantBuffer = m_device->createBuffer(constantBufferDesc);
 
 
-    for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc.samplersNum; samplerIndex++)
+    for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc->samplersNum; samplerIndex++)
     {
-        const nrd::Sampler& samplerMode = instanceDesc.samplers[samplerIndex];
+        const nrd::Sampler& samplerMode = instanceDesc->samplers[samplerIndex];
 
         nvrhi::SamplerAddressMode addressMode = nvrhi::SamplerAddressMode::Wrap;
         bool filter = false;
@@ -171,37 +171,43 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
     }
 
     nvrhi::VulkanBindingOffsets bindingOffsets;
-    bindingOffsets.shaderResource = libraryDesc.spirvBindingOffsets.textureOffset;
-    bindingOffsets.sampler = libraryDesc.spirvBindingOffsets.samplerOffset;
-    bindingOffsets.constantBuffer = libraryDesc.spirvBindingOffsets.constantBufferOffset;
-    bindingOffsets.unorderedAccess = libraryDesc.spirvBindingOffsets.storageTextureAndBufferOffset;
+    bindingOffsets.shaderResource = libraryDesc->spirvBindingOffsets.textureOffset;
+    bindingOffsets.sampler = libraryDesc->spirvBindingOffsets.samplerOffset;
+    bindingOffsets.constantBuffer = libraryDesc->spirvBindingOffsets.constantBufferOffset;
+    bindingOffsets.unorderedAccess = libraryDesc->spirvBindingOffsets.storageTextureAndBufferOffset;
 
-    assert(instanceDesc.samplersSpaceIndex != instanceDesc.constantBufferAndResourcesSpaceIndex);
+    assert(instanceDesc->constantBufferAndSamplersSpaceIndex != instanceDesc->resourcesSpaceIndex);
 
-    nvrhi::BindingLayoutDesc layoutDesc1;
-    layoutDesc1.visibility = nvrhi::ShaderType::Compute;
-    layoutDesc1.bindingOffsets = bindingOffsets;
-    layoutDesc1.registerSpace = instanceDesc.samplersSpaceIndex;
+    // BindingLayout0 (shared): Constant buffer + samplers
+    nvrhi::BindingLayoutDesc layoutDesc0;
+    layoutDesc0.visibility = nvrhi::ShaderType::Compute;
+    layoutDesc0.bindingOffsets = bindingOffsets;
+    layoutDesc0.registerSpace = instanceDesc->constantBufferAndSamplersSpaceIndex;
 
-    for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc.samplersNum; samplerIndex++)
+    nvrhi::BindingLayoutItem constantBufferItem = {};
+    constantBufferItem.type = nvrhi::ResourceType::VolatileConstantBuffer;
+    constantBufferItem.slot = instanceDesc->constantBufferRegisterIndex;
+    layoutDesc0.bindings.push_back(constantBufferItem);
+
+    for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc->samplersNum; samplerIndex++)
     {
         nvrhi::BindingLayoutItem samplerItem = {};
         samplerItem.type = nvrhi::ResourceType::Sampler;
-        samplerItem.slot = instanceDesc.samplersBaseRegisterIndex + samplerIndex;
-        layoutDesc1.bindings.push_back(samplerItem);
+        samplerItem.slot = instanceDesc->samplersBaseRegisterIndex + samplerIndex;
+        layoutDesc0.bindings.push_back(samplerItem);
     }
 
-    BindingLayout1 = m_device->createBindingLayout(layoutDesc1);
+    BindingLayout0 = m_device->createBindingLayout(layoutDesc0);
 
-    if (!BindingLayout1)
+    if (!BindingLayout0)
     {
-        assert(!"Cannot create an NRD binding layout");
+        assert(!"Cannot create an NRD CB+samplers binding layout");
         return false;
     }
 
-    for (uint32_t pipelineIndex = 0; pipelineIndex < instanceDesc.pipelinesNum; pipelineIndex++)
+    for (uint32_t pipelineIndex = 0; pipelineIndex < instanceDesc->pipelinesNum; pipelineIndex++)
     {
-        const nrd::PipelineDesc& nrdPipelineDesc = instanceDesc.pipelines[pipelineIndex];
+        const nrd::PipelineDesc& nrdPipelineDesc = instanceDesc->pipelines[pipelineIndex];
         const nrd::ComputeShaderDesc& nrdComputeShader = isVulkan ? nrdPipelineDesc.computeShaderSPIRV : nrdPipelineDesc.computeShaderDXIL;
 
         NrdPipeline pipeline;
@@ -213,15 +219,11 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
             return false;
         }
 
-        nvrhi::BindingLayoutDesc layoutDesc0;
-        layoutDesc0.visibility = nvrhi::ShaderType::Compute;
-        layoutDesc0.bindingOffsets = bindingOffsets;
-        layoutDesc0.registerSpace = instanceDesc.constantBufferAndResourcesSpaceIndex;
-
-        nvrhi::BindingLayoutItem constantBufferItem = {};
-        constantBufferItem.type = nvrhi::ResourceType::VolatileConstantBuffer;
-        constantBufferItem.slot = instanceDesc.constantBufferRegisterIndex;
-        layoutDesc0.bindings.push_back(constantBufferItem);
+        // BindingLayout1 (per-pipeline): Resources only
+        nvrhi::BindingLayoutDesc layoutDesc1;
+        layoutDesc1.visibility = nvrhi::ShaderType::Compute;
+        layoutDesc1.bindingOffsets = bindingOffsets;
+        layoutDesc1.registerSpace = instanceDesc->resourcesSpaceIndex;
 
         for (uint32_t resourceRangeIndex = 0; resourceRangeIndex < nrdPipelineDesc.resourceRangesNum; resourceRangeIndex++)
         {
@@ -243,21 +245,21 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
 
             for (uint32_t descriptorOffset = 0; descriptorOffset < nrdResourceRange.descriptorsNum; descriptorOffset++)
             {
-                resourceItem.slot = instanceDesc.resourcesBaseRegisterIndex + descriptorOffset;
-                layoutDesc0.bindings.push_back(resourceItem);
+                resourceItem.slot = instanceDesc->resourcesBaseRegisterIndex + descriptorOffset;
+                layoutDesc1.bindings.push_back(resourceItem);
             }
         }
 
-        pipeline.BindingLayout0 = m_device->createBindingLayout(layoutDesc0);
+        pipeline.BindingLayout1 = m_device->createBindingLayout(layoutDesc1);
 
-        if (!pipeline.BindingLayout0)
+        if (!pipeline.BindingLayout1)
         {
-            assert(!"Cannot create an NRD binding layout");
+            assert(!"Cannot create an NRD resources binding layout");
             return false;
         }
 
         nvrhi::ComputePipelineDesc pipelineDesc;
-        pipelineDesc.bindingLayouts = { pipeline.BindingLayout0, BindingLayout1 };
+        pipelineDesc.bindingLayouts = { BindingLayout0, pipeline.BindingLayout1 };
         pipelineDesc.CS = pipeline.Shader;
         pipeline.Pipeline = m_device->createComputePipeline(pipelineDesc);
 
@@ -271,15 +273,15 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
     }
 
 
-    const uint32_t poolSize = instanceDesc.permanentPoolSize + instanceDesc.transientPoolSize;
+    const uint32_t poolSize = instanceDesc->permanentPoolSize + instanceDesc->transientPoolSize;
 
     for (uint32_t i = 0; i < poolSize; i++)
     {
-        const bool isPermanent = (i < instanceDesc.permanentPoolSize);
+        const bool isPermanent = (i < instanceDesc->permanentPoolSize);
 
         const nrd::TextureDesc& nrdTextureDesc = isPermanent 
-            ? instanceDesc.permanentPool[i]
-            : instanceDesc.transientPool[i - instanceDesc.permanentPoolSize];
+            ? instanceDesc->permanentPool[i]
+            : instanceDesc->transientPool[i - instanceDesc->permanentPoolSize];
 
         const nvrhi::Format format = GetNvrhiFormat(nrdTextureDesc.format);
 
@@ -290,7 +292,7 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
         }
 
         std::stringstream ss;
-        ss << "NRD " << (isPermanent ? "Permanent" : "Transient") << "Texture [" << (isPermanent ? i : i - instanceDesc.permanentPoolSize) << "]";
+        ss << "NRD " << (isPermanent ? "Permanent" : "Transient") << "Texture [" << (isPermanent ? i : i - instanceDesc->permanentPoolSize) << "]";
 
         nvrhi::TextureDesc textureDesc;
         textureDesc.width = DivideUp(width, nrdTextureDesc.downsampleFactor);
@@ -401,16 +403,7 @@ void NrdIntegration::RunDenoiserPasses(
     uint32_t dispatchDescNum = 0;
     nrd::GetComputeDispatches(*m_instance, &ID, 1, dispatchDescs, dispatchDescNum);
 
-    const nrd::InstanceDesc& instanceDesc = nrd::GetInstanceDesc(*m_instance);
-
-    nvrhi::BindingSetDesc setDesc1;
-    for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc.samplersNum; samplerIndex++)
-    {
-        assert(m_samplers[samplerIndex]);
-        setDesc1.bindings.push_back(nvrhi::BindingSetItem::Sampler(instanceDesc.samplersBaseRegisterIndex + samplerIndex, m_samplers[samplerIndex]));
-    }
-
-    nvrhi::BindingSetHandle bindingSet1 = m_bindingCache.GetOrCreateBindingSet(setDesc1, BindingLayout1);
+    const nrd::InstanceDesc& instanceDesc = *nrd::GetInstanceDesc(*m_instance);
 
     for (uint32_t dispatchIndex = 0; dispatchIndex < dispatchDescNum; dispatchIndex++)
     {
@@ -424,9 +417,17 @@ void NrdIntegration::RunDenoiserPasses(
         assert(m_constantBuffer);
         commandList->writeBuffer(m_constantBuffer, dispatchDesc.constantBufferData, dispatchDesc.constantBufferDataSize);
 
+        // setDesc0: CB + samplers (shared layout)
         nvrhi::BindingSetDesc setDesc0;
         setDesc0.bindings.push_back(nvrhi::BindingSetItem::ConstantBuffer(instanceDesc.constantBufferRegisterIndex, m_constantBuffer));
+        for (uint32_t samplerIndex = 0; samplerIndex < instanceDesc.samplersNum; samplerIndex++)
+        {
+            assert(m_samplers[samplerIndex]);
+            setDesc0.bindings.push_back(nvrhi::BindingSetItem::Sampler(instanceDesc.samplersBaseRegisterIndex + samplerIndex, m_samplers[samplerIndex]));
+        }
 
+        // setDesc1: Resources (per-pipeline layout)
+        nvrhi::BindingSetDesc setDesc1;
         const nrd::PipelineDesc& nrdPipelineDesc = instanceDesc.pipelines[dispatchDesc.pipelineIndex];
         uint32_t resourceIndex = 0;
 
@@ -496,7 +497,7 @@ void NrdIntegration::RunDenoiserPasses(
                     ? nvrhi::ResourceType::Texture_SRV
                     : nvrhi::ResourceType::Texture_UAV;
 
-                setDesc0.bindings.push_back(setItem);
+                setDesc1.bindings.push_back(setItem);
 
                 resourceIndex++;
             }
@@ -506,7 +507,8 @@ void NrdIntegration::RunDenoiserPasses(
 
         const NrdPipeline& pipeline = m_pipelines[dispatchDesc.pipelineIndex];
 
-        nvrhi::BindingSetHandle bindingSet0 = m_bindingCache.GetOrCreateBindingSet(setDesc0, pipeline.BindingLayout0);
+        nvrhi::BindingSetHandle bindingSet0 = m_bindingCache.GetOrCreateBindingSet(setDesc0, BindingLayout0);
+        nvrhi::BindingSetHandle bindingSet1 = m_bindingCache.GetOrCreateBindingSet(setDesc1, pipeline.BindingLayout1);
 
         nvrhi::ComputeState state;
         state.bindings = { bindingSet0, bindingSet1 };

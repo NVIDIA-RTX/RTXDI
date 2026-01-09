@@ -957,10 +957,10 @@ void UserInterface::PostProcessSettings()
 #ifdef WITH_NRD
 void UserInterface::DenoiserSettings()
 {
-    const nrd::LibraryDesc& nrdLibraryDesc = nrd::GetLibraryDesc();
+    const nrd::LibraryDesc* nrdLibraryDesc = nrd::GetLibraryDesc();
 
     char s[128];
-    snprintf(s, sizeof(s) - 1, "Denoising (NRD v%u.%u.%u)", nrdLibraryDesc.versionMajor, nrdLibraryDesc.versionMinor, nrdLibraryDesc.versionBuild);
+    snprintf(s, sizeof(s) - 1, "Denoising (NRD v%u.%u.%u)", nrdLibraryDesc->versionMajor, nrdLibraryDesc->versionMinor, nrdLibraryDesc->versionBuild);
 
     if (ImGui_ColoredTreeNode(s, c_ColorAttentionHeader))
     {
@@ -1012,7 +1012,7 @@ void UserInterface::DenoiserSettings()
 
                     ImGui::Text("Reprojection:");
                     ImGui::SliderFloat("Spec variance boost", &m_ui.relaxSettings.specularVarianceBoost, 0.0f, 8.0f, "%.2f");
-                    ImGui::SliderFloat("Clamping sigma scale", &m_ui.relaxSettings.historyClampingColorBoxSigmaScale, 0.0f, 10.0f, "%.1f");
+                    ImGui::SliderFloat("Clamping sigma scale", &m_ui.relaxSettings.fastHistoryClampingSigmaScale, 0.0f, 10.0f, "%.1f");
 
                     ImGui::Text("Spatial filering:");
                     ImGui::SliderFloat2("Pre-pass blur radius (px)", &m_ui.relaxSettings.diffusePrepassBlurRadius, 0.0f, 50.0f, "%.1f");
@@ -1038,8 +1038,6 @@ void UserInterface::DenoiserSettings()
                 {
                     ImGui::SliderInt("History length (frames)", (int*)&m_ui.reblurSettings.maxAccumulatedFrameNum, 0, nrd::REBLUR_MAX_HISTORY_FRAME_NUM);
                     ImGui::Checkbox("Anti-firefly", &m_ui.reblurSettings.enableAntiFirefly);
-                    ImGui::SameLine();
-                    ImGui::Checkbox("Performance mode", &m_ui.reblurSettings.enablePerformanceMode);
 
                     ImGui::Text("Spatial filering:");
                     ImGui::SliderFloat2("Pre-pass blur radius (px)", &m_ui.reblurSettings.diffusePrepassBlurRadius, 0.0f, 50.0f, "%.1f");
@@ -1049,7 +1047,7 @@ void UserInterface::DenoiserSettings()
                     m_ui.reblurSettings.maxStabilizedFrameNum = std::min(m_ui.reblurSettings.maxStabilizedFrameNum, m_ui.reblurSettings.maxAccumulatedFrameNum);
                     ImGui::SliderInt("Stabilization (frames)", (int*)&m_ui.reblurSettings.maxStabilizedFrameNum, 0, m_ui.reblurSettings.maxAccumulatedFrameNum);
                     ImGui::SetNextItemWidth( ImGui::CalcItemWidth() * 0.6f );
-                    ImGui::SliderFloat("Responsive accum roughness threshold", &m_ui.reblurSettings.responsiveAccumulationRoughnessThreshold, 0.0f, 1.0f, "%.2f");
+                    ImGui::SliderFloat("Responsive accum roughness threshold", &m_ui.reblurSettings.responsiveAccumulationSettings.roughnessThreshold, 0.0f, 1.0f, "%.2f");
 
                     if (m_ui.reblurSettings.maxAccumulatedFrameNum && m_ui.reblurSettings.maxStabilizedFrameNum)
                     {
