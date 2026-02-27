@@ -62,7 +62,7 @@ void integrateVolumetricNEE(
   Sampler3D<float> volumeFilteredRadianceAge, Sampler3D<float4> volumeFilteredRadianceY, Sampler3D<float2> volumeFilteredRadianceCoCg,
   const VolumeArgs volumeArgs, const float timeMS,
   const uint2 pixelCoordinate, float2 screenUV, bool primaryMiss,
-  float3 startPosition, float hitDistance, const float3 viewDir,
+  float3 startPosition, const float hitDistance, const float3 viewDir,
   inout float3 preintegratedRadiance, inout float3 accumulatedTransmittance)
 {
   // Check if the global volumetrics are enabled
@@ -115,11 +115,13 @@ void integrateVolumetricNEE(
   // Raymarch over the froxel grid
   
   // Apply some depth offset to minimize bleeding
-  hitDistance -= (volumeArgs.froxelMaxDistance / volumeArgs.froxelDepthSlices) * volumeArgs.depthOffset;
-  
+  float volumetricMaxPathDistance =
+    primaryMiss
+      ? volumeArgs.froxelMaxDistance
+      : hitDistance - (volumeArgs.froxelMaxDistance / volumeArgs.froxelDepthSlices) * volumeArgs.depthOffset;
   // Ensure we only integrate until the end of the volume
   // TODO: Could intersect ray with atmosphere plane for performance
-  const float volumetricMaxPathDistance = primaryMiss ? volumeArgs.froxelMaxDistance : min(hitDistance, volumeArgs.froxelMaxDistance);
+  volumetricMaxPathDistance = clamp(volumetricMaxPathDistance, 0, volumeArgs.froxelMaxDistance);
   const float3 targetPosition = viewDir * volumetricMaxPathDistance + startPosition;
   
   // Setup some constants we'll use throughout integration
@@ -127,10 +129,9 @@ void integrateVolumetricNEE(
   const float3 startPositionTranslated = worldToTranslatedWorld(camera, startPosition);
   const float3 targetPositionTranslated = worldToTranslatedWorld(camera, targetPosition);
   const float3 targetVector = targetPositionTranslated - startPositionTranslated;
-  
-  // Note: Start the step at the camera origin
-  float3 previousTranslatedWorldPosition = float3(0, 0, 0);
-  
+
+  float3 previousTranslatedWorldPosition = startPositionTranslated;
+
   // Perform the integration
   for (uint z = 0; z < numSteps; z++)
   {
@@ -203,13 +204,12 @@ void integrateVolumetricNEE(
   // Since volumetrics are only calculated for a fraction of the frustum volume, we need to calculate the remaining attenuation assuming homogonous media
   // starting at the last translated world position the integration steps ended on (previousTranslatedWorldPosition).
   // This handles both the large hit distance case, and the miss case which do require separate solutions.
-  const float planeDistance = dot(targetPositionTranslated, transpose(camera.translatedWorldToView)[2].xyz);
   if (primaryMiss)
   {
-    accumulatedTransmittance = calcVolumetricAttenuation(volumeArgs, camera, true, 0.f, previousTranslatedWorldPosition, viewDir);
+    accumulatedTransmittance *= calcVolumetricAttenuation(volumeArgs, camera, true, 0.f, previousTranslatedWorldPosition, viewDir);
   }
-  else if(planeDistance > volumeArgs.froxelMaxDistance)
+  else if(hitDistance > volumeArgs.froxelMaxDistance)
   {
-    accumulatedTransmittance *= calcVolumetricAttenuation(volumeArgs, camera, false, planeDistance - volumeArgs.froxelMaxDistance, previousTranslatedWorldPosition, viewDir);
+    accumulatedTransmittance *= calcVolumetricAttenuation(volumeArgs, camera, false, hitDistance - volumeArgs.froxelMaxDistance, previousTranslatedWorldPosition, viewDir);
   }
 }
