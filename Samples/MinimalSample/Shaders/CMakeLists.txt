@@ -7,7 +7,6 @@ set(shaders
    RtxdiApplicationBridge/RAB_LightSample.hlsli
    RtxdiApplicationBridge/RAB_LightSampling.hlsli
    RtxdiApplicationBridge/RAB_Material.hlsli
-   RtxdiApplicationBridge/RAB_RandomSamplerState.hlsli
    RtxdiApplicationBridge/RAB_RayPayload.hlsli
    RtxdiApplicationBridge/RAB_RTShaders.hlsli
    RtxdiApplicationBridge/RAB_SpatialHelpers.hlsli
@@ -39,12 +38,6 @@ add_custom_target(${shaders_target}
 	SOURCES ${shaders} Shaders.cfg)
 
 set (OUTPUT_PATH_BASE "${CMAKE_BINARY_DIR}/bin/shaders/minimal-sample")
-
- if (WIN32)
-     set (USE_API_OPTION --useAPI)
- else()
-     set (USE_API_OPTION "")
- endif()
  
 if (DONUT_WITH_DX12)
    set(DX12_COMPILER_OPTIONS 
@@ -54,7 +47,6 @@ if (DONUT_WITH_DX12)
       --outputExt .bin
       -I ${DONUT_SHADER_INCLUDE_DIR}
       -I ${RTXDI_RUNTIME_INCLUDE_PATH}
-      ${USE_API_OPTION}
       --relaxedInclude "../Types.h"
       --compiler ${DXC_PATH})
 
@@ -74,7 +66,6 @@ if (DONUT_WITH_VULKAN)
       --outputExt .bin
       -I ${DONUT_SHADER_INCLUDE_DIR}
       -I ${RTXDI_RUNTIME_INCLUDE_PATH}
-      ${USE_API_OPTION}
       --relaxedInclude "../Types.h"
       -D SPIRV
       ${NVRHI_DEFAULT_VK_REGISTER_OFFSETS}

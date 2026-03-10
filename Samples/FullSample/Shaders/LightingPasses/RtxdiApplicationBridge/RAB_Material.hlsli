@@ -1,13 +1,36 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
 #ifndef RAB_MATERIAL_HLSLI
 #define RAB_MATERIAL_HLSLI
 
-static const float kMinRoughness = 0.05f;
+#include "donut/shaders/brdf.hlsli"
+#include "Rtxdi/Utils/RandomSamplerstate.hlsli"
+
+static const float kMinRoughness = 0.03f;
+
+/*
+* The RTXDI SDK RAB_Material implementation for the Full Sample uses a
+* material model of two BRDFs:
+* Diffuse is Lambertian
+* Specular is GGX/Trowbridge-Reitz
+*/
 
 struct RAB_Material
 {
     float3 diffuseAlbedo;
     float3 specularF0;
     float roughness;
+	float3 emissiveColor;
 };
 
 RAB_Material RAB_EmptyMaterial()
@@ -30,6 +53,16 @@ float3 GetSpecularF0(RAB_Material material)
 float GetRoughness(RAB_Material material)
 {
     return material.roughness;
+}
+
+float RAB_GetRoughness(RAB_Material material)
+{
+    return GetRoughness(material);
+}
+
+float3 RAB_GetEmissiveColor(RAB_Material material)
+{
+    return material.emissiveColor;
 }
 
 RAB_Material GetGBufferMaterial(

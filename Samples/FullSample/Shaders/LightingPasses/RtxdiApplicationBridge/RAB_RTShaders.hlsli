@@ -1,3 +1,15 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
 #ifndef RAB_RT_SHADERS_HLSLI
 #define RAB_RT_SHADERS_HLSLI
 
@@ -50,12 +62,12 @@ struct RayAttributes
 };
 
 [shader("miss")]
-void Miss(inout RayPayload payload : SV_RayPayload)
+void Miss(inout RAB_RayPayload payload : SV_RayPayload)
 {
 }
 
 [shader("closesthit")]
-void ClosestHit(inout RayPayload payload : SV_RayPayload, in RayAttributes attrib : SV_IntersectionAttributes)
+void ClosestHit(inout RAB_RayPayload payload : SV_RayPayload, in RayAttributes attrib : SV_IntersectionAttributes)
 {
     payload.committedRayT = RayTCurrent();
     payload.instanceID = InstanceID();
@@ -66,7 +78,7 @@ void ClosestHit(inout RayPayload payload : SV_RayPayload, in RayAttributes attri
 }
 
 [shader("anyhit")]
-void AnyHit(inout RayPayload payload : SV_RayPayload, in RayAttributes attrib : SV_IntersectionAttributes)
+void AnyHit(inout RAB_RayPayload payload : SV_RayPayload, in RayAttributes attrib : SV_IntersectionAttributes)
 {
     if (!considerTransparentMaterial(InstanceID(), GeometryIndex(), PrimitiveIndex(), attrib.uv, payload.throughput))
         IgnoreHit();

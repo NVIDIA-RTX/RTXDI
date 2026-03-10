@@ -3,7 +3,7 @@
 
 #include "../GBufferHelpers.hlsli"
 
-#include "RAB_RandomSamplerState.hlsli"
+#include "Rtxdi/Utils/RandomSamplerstate.hlsli"
 #include "RAB_Material.hlsli"
 
 // A surface with enough information to evaluate BRDFs
@@ -117,12 +117,12 @@ float3 tangentToWorld(RAB_Surface surface, float3 h)
 
 // Output an importanced sampled reflection direction from the BRDF given the view
 // Return true if the returned direction is above the surface
-bool RAB_GetSurfaceBrdfSample(RAB_Surface surface, inout RAB_RandomSamplerState rng, out float3 dir)
+bool RAB_SurfaceImportanceSampleBrdf(RAB_Surface surface, inout RTXDI_RandomSamplerState rng, out float3 dir)
 {
     float3 rand;
-    rand.x = RAB_GetNextRandom(rng);
-    rand.y = RAB_GetNextRandom(rng);
-    rand.z = RAB_GetNextRandom(rng);
+    rand.x = RTXDI_GetNextRandom(rng);
+    rand.y = RTXDI_GetNextRandom(rng);
+    rand.z = RTXDI_GetNextRandom(rng);
     if (rand.x < surface.diffuseProbability)
     {
         float pdf;
@@ -139,7 +139,7 @@ bool RAB_GetSurfaceBrdfSample(RAB_Surface surface, inout RAB_RandomSamplerState 
 }
 
 // Return PDF wrt solid angle for the BRDF in the given dir
-float RAB_GetSurfaceBrdfPdf(RAB_Surface surface, float3 dir)
+float RAB_SurfaceEvaluateBrdfPdf(RAB_Surface surface, float3 dir)
 {
     float cosTheta = saturate(dot(surface.normal, dir));
     float diffusePdf = cosTheta / M_PI;

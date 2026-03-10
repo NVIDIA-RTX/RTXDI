@@ -34,6 +34,9 @@ class RtxdiResources;
 class EnvironmentLight;
 struct ResamplingConstants;
 
+RTXDI_DIInitialSamplingParameters GetDefaultMinimalSampleInitialSamplingParams();
+RTXDI_DISpatioTemporalResamplingParameters GetDefaultMinimalSpaioTemporalParams();
+
 class RenderPass
 {
 public:
@@ -42,10 +45,8 @@ public:
         bool unbiasedMode = false;
         bool enableResampling = true;
 
-        uint32_t numInitialSamples = 8;
-        uint32_t numSpatialSamples = 1;
-        uint32_t numInitialBRDFSamples = 1;
-        float brdfCutoff = 0.f;
+        RTXDI_DIInitialSamplingParameters initialSamplingParams = GetDefaultMinimalSampleInitialSamplingParams();
+        RTXDI_DISpatioTemporalResamplingParameters spaioTemporalResamplingParams = GetDefaultMinimalSpaioTemporalParams();
     };
 
     RenderPass(

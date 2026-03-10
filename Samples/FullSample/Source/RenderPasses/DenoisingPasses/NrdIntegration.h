@@ -1,0 +1,76 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
+#pragma once
+
+#if WITH_NRD
+
+#include <NRD.h>
+#include <nvrhi/nvrhi.h>
+#include <unordered_map>
+#include <donut/engine/BindingCache.h>
+#include <donut/core/math/math.h>
+#include "NrdIntegrationDebugSettings.h"
+
+class RenderTargets;
+
+namespace donut::engine
+{
+    class PlanarView;
+}
+
+class NrdIntegration
+{
+public:
+    NrdIntegration(nvrhi::IDevice* device, nrd::Denoiser denoiser);
+
+    bool Initialize(uint32_t width, uint32_t height);
+    bool IsAvailable() const;
+
+    void RunDenoiserPasses(
+        nvrhi::ICommandList* commandList,
+        const RenderTargets& renderTargets,
+        const donut::engine::PlanarView& view,
+        const donut::engine::PlanarView& viewPrev,
+        uint32_t frameIndex,
+        bool enableConfidenceInputs,
+        const void* denoiserSettings,
+        const NrdIntegrationDebugSettings& debugSettings,
+        bool enablePsr,
+        float debug);
+
+    const nrd::Denoiser GetDenoiser() const;
+
+private:
+    nvrhi::DeviceHandle m_device;
+    bool m_initialized;
+    nrd::Instance* m_instance;
+    nrd::Denoiser m_denoiser;
+
+    struct NrdPipeline
+    {
+        nvrhi::ShaderHandle Shader;
+        nvrhi::BindingLayoutHandle BindingLayout1;
+        nvrhi::ComputePipelineHandle Pipeline;
+    };
+
+    nvrhi::BindingLayoutHandle BindingLayout0;
+    nvrhi::BufferHandle m_constantBuffer;
+    std::vector<NrdPipeline> m_pipelines;
+    std::vector<nvrhi::SamplerHandle> m_samplers;
+    std::vector<nvrhi::TextureHandle> m_permanentTextures;
+    std::vector<nvrhi::TextureHandle> m_transientTextures;
+    donut::engine::BindingCache m_bindingCache;
+    dm::float2 m_pixelOffsetPrev;
+};
+
+#endif

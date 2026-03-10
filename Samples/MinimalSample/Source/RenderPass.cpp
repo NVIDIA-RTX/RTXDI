@@ -25,6 +25,34 @@ using namespace donut::math;
 
 using namespace donut::engine;
 
+RTXDI_DIInitialSamplingParameters GetDefaultMinimalSampleInitialSamplingParams()
+{
+    RTXDI_DIInitialSamplingParameters iParams = {};
+    iParams.numLocalLightSamples = 8;
+    iParams.numBrdfSamples = 1;
+    iParams.numInfiniteLightSamples = 0;
+    iParams.numEnvironmentSamples = 0;
+    iParams.brdfCutoff = 0.0f;
+    iParams.brdfRayMinT = 0.0f;
+    return iParams;
+}
+
+RTXDI_DISpatioTemporalResamplingParameters GetDefaultMinimalSpaioTemporalParams()
+{
+    RTXDI_DISpatioTemporalResamplingParameters stParams = {};
+    stParams.maxHistoryLength = 20;
+    stParams.biasCorrectionMode = ReSTIRDI_SpatioTemporalBiasCorrectionMode::Basic;
+    stParams.depthThreshold = 0.1f;
+    stParams.normalThreshold = 0.5f;
+    stParams.numSamples = 2;
+    stParams.numDisocclusionBoostSamples = 0;
+    stParams.samplingRadius = 32;
+    stParams.enableVisibilityShortcut = true;
+    stParams.enablePermutationSampling = true;
+    stParams.discountNaiveSamples = false;
+    return stParams;
+}
+
 RenderPass::RenderPass(
     nvrhi::IDevice* device, 
     std::shared_ptr<ShaderFactory> shaderFactory,
@@ -148,22 +176,20 @@ void RenderPass::Render(
     const RTXDI_LightBufferParameters& lightBufferParams)
 {
     ResamplingConstants constants = {};
-    constants.frameIndex = context.GetFrameIndex();
     view.FillPlanarViewConstants(constants.view);
     previousView.FillPlanarViewConstants(constants.prevView);
 
     constants.enableResampling = localSettings.enableResampling;
-    constants.unbiasedMode = localSettings.unbiasedMode;
-    constants.numInitialSamples = localSettings.numInitialSamples;
-    constants.numInitialBRDFSamples = localSettings.numInitialBRDFSamples;
-    constants.numSpatialSamples = localSettings.numSpatialSamples;
+    constants.initialSamplingParams = localSettings.initialSamplingParams;
+    constants.spatioTemporalResamplingParams = localSettings.spaioTemporalResamplingParams;
     constants.restirDIReservoirBufferParams = context.GetReservoirBufferParameters();
     constants.lightBufferParams = lightBufferParams;
     constants.runtimeParams.neighborOffsetMask = context.GetStaticParameters().NeighborOffsetCount - 1;
     constants.runtimeParams.activeCheckerboardField = 0;
+    constants.runtimeParams.frameIndex = context.GetFrameIndex();
 
-    constants.inputBufferIndex = !(context.GetFrameIndex() & 1);
-    constants.outputBufferIndex = context.GetFrameIndex() & 1;
+    constants.inputBufferIndex = context.GetBufferIndices().temporalResamplingInputBufferIndex;
+    constants.outputBufferIndex = context.GetBufferIndices().initialSamplingOutputBufferIndex;
     
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 

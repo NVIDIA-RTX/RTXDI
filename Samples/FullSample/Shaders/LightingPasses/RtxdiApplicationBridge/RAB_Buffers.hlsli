@@ -1,5 +1,22 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
 #ifndef RAB_BUFFER_HLSLI
 #define RAB_BUFFER_HLSLI
+
+#include <SharedShaderInclude/ShaderParameters.h>
+#include <SharedShaderInclude/ShaderDebug/ShaderDebugPrintShared.h>
+#include <SharedShaderInclude/ShaderDebug/PTPathViz/PTPathVertexRecord.h>
+#include <SharedShaderInclude/ShaderDebug/PTPathViz/PTPathSetRecord.h>
 
 // G-buffer resources
 Texture2D<float> t_GBufferDepth : register(t0);
@@ -39,6 +56,18 @@ RWTexture2D<int2> u_TemporalSamplePositions : register(u3);
 RWTexture2DArray<float4> u_Gradients : register(u4);
 RWTexture2D<float2> u_RestirLuminance : register(u5);
 RWStructuredBuffer<RTXDI_PackedGIReservoir> u_GIReservoirs : register(u6);
+RWStructuredBuffer<RTXDI_PackedPTReservoir> u_PTReservoirs : register(u7);
+
+// PSR UAVs
+RWTexture2D<float> u_PSRDepth : register(u20);
+RWTexture2D<float4> u_PSRNormalRoughness : register(u21);
+RWTexture2D<float4> u_PSRMotionVectors : register(u22);
+RWTexture2D<float> u_PSRHitT : register(u23);
+RWTexture2D<uint> u_PSRDiffuseAlbedo : register(u24);
+RWTexture2D<uint> u_PSRSpecularF0 : register(u25);
+RWTexture2D<uint> u_PSRLightDir : register(u26);
+RWTexture2D<uint> u_PTSampleIDTexture : register(u27);
+RWTexture2D<uint> u_PTDuplicationMap : register(u28);
 
 // RTXDI UAVs
 RWBuffer<uint2> u_RisBuffer : register(u10);
@@ -46,9 +75,27 @@ RWBuffer<uint4> u_RisLightDataBuffer : register(u11);
 RWBuffer<uint> u_RayCountBuffer : register(u12);
 RWStructuredBuffer<SecondaryGBufferData> u_SecondaryGBuffer : register(u13);
 
-// Other
+// Constant buffer
 ConstantBuffer<ResamplingConstants> g_Const : register(b0);
 VK_PUSH_CONSTANT ConstantBuffer<PerPassConstants> g_PerPassConstants : register(b1);
+
+// Debug Print
+ConstantBuffer<ShaderPrintCBData> g_debugPrintCB : register(b2);
+RWByteAddressBuffer u_DebugPrintBuffer : register(u16);
+#define RTXDI_SHADER_DEBUG_PRINT_CB g_debugPrintCB
+#define RTXDI_SHADER_DEBUG_PRINT_OUTPUT_BUFFER u_DebugPrintBuffer
+
+// PT Path Viz
+RWStructuredBuffer<PTPathVertexRecord> u_debugPathRecord : register(u14);
+RWStructuredBuffer<PTPathSet> u_debugPathSet : register(u15);
+#define DEBUG_PT_VERTEX_RECORD_BUFFER u_debugPathRecord
+#define DEBUG_PT_PATH_SET_BUFFER u_debugPathSet
+
+// Debug Lighting Buffers
+RWTexture2D<float4> u_DirectLightingRaw : register(u17);
+RWTexture2D<float4> u_IndirectLightingRaw : register(u18);
+
+// Other
 SamplerState s_MaterialSampler : register(s0);
 SamplerState s_EnvironmentSampler : register(s1);
 
@@ -56,6 +103,8 @@ SamplerState s_EnvironmentSampler : register(s1);
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
 #define RTXDI_GI_RESERVOIR_BUFFER u_GIReservoirs
+#define RTXDI_PT_RESERVOIR_BUFFER u_PTReservoirs
+#define RTXDI_PT_DEBUG u_debug
 
 #define IES_SAMPLER s_EnvironmentSampler
 
@@ -72,6 +121,16 @@ int RAB_TranslateLightIndex(uint lightIndex, bool currentToPrevious)
     // The buffer is cleared with zeros which indicate an invalid mapping.
     // Subtract that one to make this function return expected values.
     return int(mappedIndexPlusOne) - 1;
+}
+
+// Duplication map: count of pixels sharing the same sample ID in a neighborhood (max 288).
+// Used for duplication-based temporal history reduction (MCap). prevPixelPos is in pixel space.
+uint RAB_GetDuplicationMapCount(int2 prevPixelPos)
+{
+    int2 dim = int2(g_Const.view.viewportSize);
+    if (any(prevPixelPos < 0) || any(prevPixelPos >= dim))
+        return 0u;
+    return u_PTDuplicationMap[prevPixelPos];
 }
 
 #endif // RAB_BUFFER_HLSLI

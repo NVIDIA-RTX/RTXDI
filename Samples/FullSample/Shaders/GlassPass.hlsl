@@ -1,18 +1,22 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
 #include <donut/shaders/brdf.hlsli>
-#include "ShaderParameters.h"
+#include <donut/shaders/packing.hlsli>
+#include "SharedShaderInclude/ShaderParameters.h"
 #include "SceneGeometry.hlsli"
+#include "HelperFunctions.hlsli"
 
 ConstantBuffer<GlassConstants> g_Const : register(b0);
 VK_PUSH_CONSTANT ConstantBuffer<PerPassConstants> g_PerPassConstants : register(b1);
@@ -25,6 +29,8 @@ StructuredBuffer<InstanceData> t_InstanceData : register(t1);
 StructuredBuffer<GeometryData> t_GeometryData : register(t2);
 StructuredBuffer<MaterialConstants> t_MaterialConstants : register(t3);
 Texture2D<float4> t_Emissive : register(t4);
+Texture2D<uint> t_GBufferDiffuseAlbedo : register(t5);
+Texture2D<uint> t_GBufferSpecularRough : register(t6);
 
 SamplerState s_MaterialSampler : register(s0);
 SamplerState s_EnvironmentSampler : register(s1);
@@ -79,12 +85,17 @@ void AnyHit(inout RayPayload payload : SV_RayPayload, in RayAttributes attrib : 
 }
 #endif
 
-void tracePrimaryRay(inout RayPayload payload, RayDesc ray)
+void tracePrimaryRay(inout RayPayload payload, RayDesc ray, bool firstRay)
 {
+    uint InstanceInclusionMask = INSTANCE_MASK_TRANSPARENT;
+
+    if (firstRay)
+        InstanceInclusionMask |= INSTANCE_MASK_OPAQUE;
+
 #if USE_RAY_QUERY
     RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_CULL_BACK_FACING_TRIANGLES > rayQuery;
 
-    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, INSTANCE_MASK_TRANSPARENT, ray);
+    rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, InstanceInclusionMask, ray);
 
     rayQuery.Proceed();
 
@@ -96,7 +107,7 @@ void tracePrimaryRay(inout RayPayload payload, RayDesc ray)
         payload.committedRayT = rayQuery.CommittedRayT();
     }
 #else
-    TraceRay(SceneBVH, RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_CULL_BACK_FACING_TRIANGLES, INSTANCE_MASK_TRANSPARENT, 0, 0, 0, ray, payload);
+    TraceRay(SceneBVH, RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES | RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_CULL_BACK_FACING_TRIANGLES, InstanceInclusionMask, 0, 0, 0, ray, payload);
 #endif
     
     REPORT_RAY(payload.instanceID != ~0u);
@@ -176,21 +187,22 @@ void RayGen()
     uint2 pixelPosition = DispatchRaysIndex().xy;
 #endif
 
-    float maxGlassHitT = t_Emissive[pixelPosition].a;
-    if(maxGlassHitT <= 0)
-        return;
+    float maxGlassHitT = 1e10;
 
     float3 throughput = 1.0;
     float3 overlay = 0.0;
+    bool includeOpaqueGeo = true;
 
     RayDesc ray = setupPrimaryRay(pixelPosition, g_Const.view, maxGlassHitT + 0.01);
+
+    bool firstBounceGlass = false;
 
     for (uint surfaceIndex = 0; surfaceIndex < 8; surfaceIndex++)
     {
         RayPayload payload = (RayPayload)0;
         payload.instanceID = ~0u;
 
-        tracePrimaryRay(payload, ray);
+        tracePrimaryRay(payload, ray, includeOpaqueGeo);
 
         if (payload.instanceID == ~0u)
             break;
@@ -208,7 +220,7 @@ void RayGen()
             GeomAttr_TexCoord | GeomAttr_Normal | GeomAttr_Tangents,
             t_InstanceData, t_GeometryData, t_MaterialConstants);
 
-        MaterialSample ms = sampleGeometryMaterial(gs, 0, 0, 0, MatAttr_BaseColor | MatAttr_Normal | MatAttr_Transmission | MatAttr_Emissive,
+        MaterialSample ms = sampleGeometryMaterial(gs, 0, 0, 0, MatAttr_BaseColor | MatAttr_Normal | MatAttr_Transmission | MatAttr_Emissive | MatAttr_MetalRough,
             s_MaterialSampler, g_Const.normalMapScale);
 
         if (surfaceIndex == 0 && all(g_Const.materialReadbackPosition == int2(pixelPosition)))
@@ -218,10 +230,31 @@ void RayGen()
 
         bool alphaMask = ms.opacity >= gs.material.alphaCutoff;
 
-        if (gs.material.domain == MaterialDomain_Transmissive ||
+        if (gs.material.domain == MaterialDomain_Opaque)
+        {
+            if (g_Const.indirectLightingMode != INDIRECT_LIGHTING_MODE_RESTIRPT)
+                break;
+            float kMinRoughness = 0.01;
+            if (ms.roughness <= kMinRoughness)
+            {
+                float3 surfaceNormal = ms.shadingNormal;
+
+                if (dot(surfaceNormal, ray.Direction) > 0)
+                    surfaceNormal = -surfaceNormal;
+
+                ray.Direction = reflect(ray.Direction, surfaceNormal);
+                ray.Origin = surfacePosition + ray.Direction * 0.001;
+            }
+            else
+            {
+                break; // opaque non-mirror surface, quit
+            }
+        }
+        else if (gs.material.domain == MaterialDomain_Transmissive ||
             (gs.material.domain == MaterialDomain_TransmissiveAlphaTested && alphaMask) ||
             gs.material.domain == MaterialDomain_TransmissiveAlphaBlended)
         {
+            if (surfaceIndex == 0) firstBounceGlass = true;
             float3 surfaceNormal = ms.shadingNormal;
 
             if (dot(surfaceNormal, ray.Direction) > 0)
@@ -266,7 +299,12 @@ void RayGen()
     {
         float4 previousColor = u_CompositedColor[pixelPosition];
 
-        float3 newColor = previousColor.rgb * throughput + overlay;
+        // Attenuate glass reflection by underlying surface metalness (full on metal, none on dielectric)
+        float3 diffuseAlbedo = Unpack_R11G11B10_UFLOAT(t_GBufferDiffuseAlbedo[pixelPosition]);
+        float3 specularF0 = Unpack_R8G8B8A8_Gamma_UFLOAT(t_GBufferSpecularRough[pixelPosition]).rgb;
+        float metalness = getMetalness(diffuseAlbedo, specularF0);
+
+        float3 newColor = previousColor.rgb * (lerp(1.f, throughput, (firstBounceGlass ? 1.f : metalness))) + overlay;
 
         u_CompositedColor[pixelPosition] = float4(newColor.rgb, previousColor.a);
     }

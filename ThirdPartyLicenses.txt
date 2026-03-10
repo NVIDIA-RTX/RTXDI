@@ -1,3 +1,6 @@
+This repository uses submodules that each contain their own 3rd party dependencies.
+Please check each submodule accordingly for the 3rd party licenses used, in addition to what is listed in this file.
+Review the license terms of these open source projects before use.
 
 ################################################################################
 #####                                                                      #####

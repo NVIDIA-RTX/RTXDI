@@ -13,6 +13,16 @@ RAB_LightSample RAB_EmptyLightSample()
     return lightSample;
 }
 
+float3 RAB_LightSamplePosition(RAB_LightSample lightSample)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
+float3 RAB_LightSampleRadiance(RAB_LightSample lightSample)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
 bool RAB_IsAnalyticLightSample(RAB_LightSample lightSample)
 {
     return true;

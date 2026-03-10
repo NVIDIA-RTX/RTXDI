@@ -6,12 +6,15 @@ set(sources
     Shaders/RtxdiApplicationBridge/RAB_LightSample.hlsli
     Shaders/RtxdiApplicationBridge/RAB_LightSampling.hlsli
     Shaders/RtxdiApplicationBridge/RAB_Material.hlsli
-    Shaders/RtxdiApplicationBridge/RAB_RandomSamplerState.hlsli
     Shaders/RtxdiApplicationBridge/RAB_RayPayload.hlsli
     Shaders/RtxdiApplicationBridge/RAB_RTShaders.hlsli
     Shaders/RtxdiApplicationBridge/RAB_SpatialHelpers.hlsli
     Shaders/RtxdiApplicationBridge/RAB_Surface.hlsli
     Shaders/RtxdiApplicationBridge/RAB_VisibilityTest.hlsli
+    Shaders/RtxdiApplicationBridge/PathTracer/RAB_DenoiserCallbacks.hlsli
+    Shaders/RtxdiApplicationBridge/PathTracer/RAB_MISCallbacks.hlsli
+    Shaders/RtxdiApplicationBridge/PathTracer/RAB_PathTracer.hlsli
+    Shaders/RtxdiApplicationBridge/PathTracer/RAB_PathTracerUserData.hlsli
     Shaders/RtxdiApplicationBridge/RtxdiApplicationBridge.glsli
     Shaders/RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli)
 
@@ -23,7 +26,7 @@ foreach(source IN LISTS sources)
 endforeach()
 
 set(project RtxdiRuntimeShaderTests)
-set(folder "RTXDI SDK")
+set(folder "RTXDI SDK Tests")
 
 include(CMakeDependentOption)
 
@@ -44,7 +47,7 @@ if (DONUT_WITH_DX12)
 		OUTPUT ${output_file}
 		MAIN_DEPENDENCY ${source_file}
 		DEPENDS ${shader_dependencies}
-		COMMAND ${DXC_PATH} -nologo -WX -Tcs_6_5 ${source_file} -Fo ${output_file} -I${RTXDI_RUNTIME_INCLUDE_PATH}
+		COMMAND ${DXC_PATH} -nologo -WX -Tcs_6_5 ${source_file} -Fo ${output_file} -I${RTXDI_RUNTIME_INCLUDE_PATH} -enable-16bit-types
 	)
 
 	target_sources(${project} PRIVATE ${output_file})
@@ -63,7 +66,7 @@ if (DONUT_WITH_VULKAN)
 		OUTPUT ${output_file}
 		MAIN_DEPENDENCY ${source_file}
 		DEPENDS ${shader_dependencies}
-		COMMAND ${DXC_SPIRV_PATH} -nologo -WX -Tcs_6_5 -fspv-target-env=vulkan1.2 ${source_file} -Fo ${output_file} -I${RTXDI_RUNTIME_INCLUDE_PATH}
+		COMMAND ${DXC_SPIRV_PATH} -nologo -WX -Tcs_6_5 -fspv-target-env=vulkan1.2 ${source_file} -Fo ${output_file} -I${RTXDI_RUNTIME_INCLUDE_PATH} -enable-16bit-types
 	)
 
 	target_sources(${project} PRIVATE ${output_file})

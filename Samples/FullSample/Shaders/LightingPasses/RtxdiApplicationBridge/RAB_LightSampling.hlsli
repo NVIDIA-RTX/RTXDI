@@ -1,3 +1,15 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
 #ifndef RAB_LIGHT_SAMPLING_HLSLI
 #define RAB_LIGHT_SAMPLING_HLSLI
 
@@ -39,8 +51,13 @@ float RAB_EvaluateEnvironmentMapSamplingPdf(float3 L)
 // Evaluates pdf for a particular light
 float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
 {
+    RTXDI_LightBufferRegion region = g_Const.lightBufferParams.localLightBufferRegion;
+    if (lightIndex < region.firstLightIndex || lightIndex >= region.firstLightIndex + region.numLights)
+        return 0.0;
+
+    uint localLightIndex = lightIndex - region.firstLightIndex;
     uint2 pdfTextureSize = g_Const.localLightPdfTextureSize.xy;
-    uint2 texelPosition = RTXDI_LinearIndexToZCurve(lightIndex);
+    uint2 texelPosition = RTXDI_LinearIndexToZCurve(localLightIndex);
     float texelValue = t_LocalLightPdfTexture[texelPosition].r;
 
     int lastMipLevel = max(0, int(floor(log2(max(pdfTextureSize.x, pdfTextureSize.y)))));
@@ -51,30 +68,6 @@ float RAB_EvaluateLocalLightSourcePdf(uint lightIndex)
     float sum = averageValue * square(1u << lastMipLevel);
 
     return texelValue / sum;
-}
-
-float3 RAB_GetReflectedRadianceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
-{
-    float3 L = normalize(incomingRadianceLocation - surface.worldPos);
-    float3 N = surface.normal;
-    float3 V = surface.viewDir;
-
-    if (dot(L, surface.geoNormal) <= 0)
-        return 0;
-
-    float d = Lambert(N, -L);
-    float3 s;
-    if (surface.material.roughness == 0)
-        s = 0;
-    else
-        s = GGX_times_NdotL(V, L, N, max(surface.material.roughness, kMinRoughness), surface.material.specularF0);
-
-    return incomingRadiance * (d * surface.material.diffuseAlbedo + s);
-}
-
-float RAB_GetReflectedLuminanceForSurface(float3 incomingRadianceLocation, float3 incomingRadiance, RAB_Surface surface)
-{
-    return RTXDI_Luminance(RAB_GetReflectedRadianceForSurface(incomingRadianceLocation, incomingRadiance, surface));
 }
 
 // Computes the weight of the given light samples when the given surface is
@@ -88,15 +81,23 @@ float RAB_GetLightSampleTargetPdfForSurface(RAB_LightSample lightSample, RAB_Sur
     if (lightSample.solidAnglePdf <= 0)
         return 0;
     
-    return RAB_GetReflectedLuminanceForSurface(lightSample.position, lightSample.radiance, surface) / lightSample.solidAnglePdf;
+    return RAB_GetReflectedBrdfLuminanceForSurface(lightSample.position, lightSample.radiance, surface) / lightSample.solidAnglePdf;
 }
 
 // Computes the weight of the given GI sample when the given surface is shaded using that GI sample.
 float RAB_GetGISampleTargetPdfForSurface(float3 samplePosition, float3 sampleRadiance, RAB_Surface surface)
 {
-    float3 reflectedRadiance = RAB_GetReflectedRadianceForSurface(samplePosition, sampleRadiance, surface);
+    float3 reflectedRadiance = RAB_GetReflectedBrdfRadianceForSurface(samplePosition, sampleRadiance, surface);
 
     return RTXDI_Luminance(reflectedRadiance);
+}
+
+// Computes the weight of the given PT sample when the given surface is shaded using that GI sample.
+float3 RAB_GetPTSampleTargetPdfForSurface(float3 samplePosition, float3 sampleRadiance, RAB_Surface surface)
+{
+    float3 reflectedRadiance = RAB_GetReflectedBsdfRadianceForSurface(samplePosition, sampleRadiance, surface);
+
+    return max(reflectedRadiance, 0.0);
 }
 
 void RAB_GetLightDirDistance(RAB_Surface surface, RAB_LightSample lightSample,
@@ -133,6 +134,11 @@ float3 GetEnvironmentRadiance(float3 direction)
     environmentRadiance *= g_Const.sceneConstants.environmentScale;
 
     return environmentRadiance;
+}
+
+float3 RAB_GetEnvironmentRadiance(float3 direction)
+{
+	return GetEnvironmentRadiance(direction);
 }
 
 bool IsComplexSurface(int2 pixelPosition, RAB_Surface surface)
@@ -187,7 +193,7 @@ bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, floa
         hitUV = rayQuery.CommittedTriangleBarycentrics();
     }
 #else
-    RayPayload payload = (RayPayload)0;
+    RAB_RayPayload payload = (RAB_RayPayload)0;
     payload.instanceID = ~0u;
     payload.throughput = 1.0;
 

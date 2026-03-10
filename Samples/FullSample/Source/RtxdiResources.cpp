@@ -1,22 +1,29 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #include "RtxdiResources.h"
+
 #include <Rtxdi/DI/ReSTIRDI.h>
 #include <Rtxdi/GI/ReSTIRGI.h>
 #include <Rtxdi/LightSampling/RISBufferSegmentAllocator.h>
+#include <Rtxdi/PT/ReSTIRPT.h>
+
+#include <donut/core/math/math.h>
+using namespace donut::math;
 
 #include <donut/core/math/math.h>
 
 using namespace dm;
-#include "../shaders/ShaderParameters.h"
+#include "SharedShaderInclude/ShaderParameters.h"
 
 RtxdiResources::RtxdiResources(
     nvrhi::IDevice* device, 
@@ -112,14 +119,14 @@ RtxdiResources::RtxdiResources(
     NeighborOffsetsBuffer = device->createBuffer(neighborOffsetBufferDesc);
 
 
-    nvrhi::BufferDesc lightReservoirBufferDesc;
-    lightReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedDIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRDIReservoirBuffers;
-    lightReservoirBufferDesc.structStride = sizeof(RTXDI_PackedDIReservoir);
-    lightReservoirBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
-    lightReservoirBufferDesc.keepInitialState = true;
-    lightReservoirBufferDesc.debugName = "LightReservoirBuffer";
-    lightReservoirBufferDesc.canHaveUAVs = true;
-    LightReservoirBuffer = device->createBuffer(lightReservoirBufferDesc);
+    nvrhi::BufferDesc diReservoirBufferDesc;
+    diReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedDIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRDIReservoirBuffers;
+    diReservoirBufferDesc.structStride = sizeof(RTXDI_PackedDIReservoir);
+    diReservoirBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    diReservoirBufferDesc.keepInitialState = true;
+    diReservoirBufferDesc.debugName = "DIReservoirBuffer";
+    diReservoirBufferDesc.canHaveUAVs = true;
+    DIReservoirBuffer = device->createBuffer(diReservoirBufferDesc);
 
 
     nvrhi::BufferDesc secondaryGBufferDesc;
@@ -161,6 +168,15 @@ RtxdiResources::RtxdiResources(
     giReservoirBufferDesc.debugName = "GIReservoirBuffer";
     giReservoirBufferDesc.canHaveUAVs = true;
     GIReservoirBuffer = device->createBuffer(giReservoirBufferDesc);
+
+    nvrhi::BufferDesc ptReservoirBufferDesc;
+    ptReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedPTReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRPTReservoirBuffers;
+    ptReservoirBufferDesc.structStride = sizeof(RTXDI_PackedPTReservoir);
+    ptReservoirBufferDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    ptReservoirBufferDesc.keepInitialState = true;
+    ptReservoirBufferDesc.debugName = "PTReservoirBuffer";
+    ptReservoirBufferDesc.canHaveUAVs = true;
+    PTReservoirBuffer = device->createBuffer(ptReservoirBufferDesc);
 }
 
 void RtxdiResources::InitializeNeighborOffsets(nvrhi::ICommandList* commandList, uint32_t neighborOffsetCount)

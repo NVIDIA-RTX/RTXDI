@@ -14,8 +14,11 @@
 
 #include <Rtxdi/DI/ReSTIRDIParameters.h>
 #include <Rtxdi/GI/ReSTIRGIParameters.h>
+#include <Rtxdi/PT/ReSTIRPTParameters.h>
 
 #include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+#define RTXDI_RESTIR_PT_INITIAL_SAMPLING
+#include "RtxdiApplicationBridge/PathTracer/RAB_PathTracer.hlsli"
 
 #define RTXDI_ENABLE_BOILING_FILTER
 #define RTXDI_BOILING_FILTER_GROUP_SIZE 16
@@ -30,6 +33,9 @@
 #include <Rtxdi/DI/SpatialResampling.hlsli>
 #include <Rtxdi/DI/SpatioTemporalResampling.hlsli>
 #include <Rtxdi/DI/TemporalResampling.hlsli>
+#include <Rtxdi/PT/InitialSampling.hlsli>
+#include <Rtxdi/PT/TemporalResampling.hlsli>
+#include <Rtxdi/PT/SpatialResampling.hlsli>
 
 [numthreads(1, 1, 1)]
 void main()

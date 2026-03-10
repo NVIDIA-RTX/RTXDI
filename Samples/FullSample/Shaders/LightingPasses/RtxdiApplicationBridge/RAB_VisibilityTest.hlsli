@@ -1,7 +1,20 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
 #ifndef RAB_VISIBILITY_TEST_HLSLI
 #define RAB_VISIBILITY_TEST_HLSLI
 
 #include "../../SceneGeometry.hlsli"
+#include "RAB_LightSample.hlsli"
 
 RayDesc setupVisibilityRay(RAB_Surface surface, float3 samplePosition, float offset = 0.001)
 {
@@ -29,7 +42,7 @@ bool GetConservativeVisibility(RaytracingAccelerationStructure accelStruct, RAB_
 
     bool visible = (rayQuery.CommittedStatus() == COMMITTED_NOTHING);
 #else
-    RayPayload payload = (RayPayload)0;
+    RAB_RayPayload payload = (RAB_RayPayload)0;
     payload.instanceID = ~0u;
     payload.throughput = 1.0;
 
@@ -82,7 +95,7 @@ float3 GetFinalVisibility(RaytracingAccelerationStructure accelStruct, RAB_Surfa
     if (!g_Const.sceneConstants.enableTransparentGeometry && !g_Const.sceneConstants.enableAlphaTestedGeometry)
         rayFlags |= RAY_FLAG_CULL_NON_OPAQUE;
 
-    RayPayload payload = (RayPayload)0;
+    RAB_RayPayload payload = (RAB_RayPayload)0;
     payload.instanceID = ~0u;
     payload.throughput = 1.0;
 

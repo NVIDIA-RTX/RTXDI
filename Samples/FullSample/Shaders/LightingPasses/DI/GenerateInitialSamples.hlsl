@@ -1,18 +1,21 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
 
 #include <Rtxdi/DI/InitialSampling.hlsli>
+#include <Rtxdi/DI/ReservoirStorage.hlsli>
 
 #if USE_RAY_QUERY
 [numthreads(RTXDI_SCREEN_SPACE_GROUP_SIZE, RTXDI_SCREEN_SPACE_GROUP_SIZE, 1)]
@@ -30,22 +33,14 @@ void RayGen()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 1);
-    RAB_RandomSamplerState tileRng = RAB_InitRandomSampler(pixelPosition / RTXDI_TILE_SIZE_IN_PIXELS, 1);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, RTXDI_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
+    RTXDI_RandomSamplerState tileRng = RTXDI_InitRandomSampler(pixelPosition / RTXDI_TILE_SIZE_IN_PIXELS, g_Const.runtimeParams.frameIndex, RTXDI_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
-    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-        g_Const.restirDI.initialSamplingParams.numPrimaryLocalLightSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryBrdfSamples,
-        g_Const.restirDI.initialSamplingParams.brdfCutoff,
-        0.001f);
-
     RAB_LightSample lightSample;
     RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, surface,
-        sampleParams, g_Const.lightBufferParams, g_Const.restirDI.initialSamplingParams.localLightSamplingMode,
+        g_Const.restirDI.initialSamplingParams, g_Const.lightBufferParams,
 #ifdef RTXDI_ENABLE_PRESAMPLING
         g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
@@ -53,14 +48,6 @@ void RayGen()
 #endif
 #endif
         lightSample);
-
-    if (g_Const.restirDI.initialSamplingParams.enableInitialVisibility && RTXDI_IsValidDIReservoir(reservoir))
-    {
-        if (!RAB_GetConservativeVisibility(surface, lightSample))
-        {
-            RTXDI_StoreVisibilityInDIReservoir(reservoir, 0, true);
-        }
-    }
 
     RTXDI_StoreDIReservoir(reservoir, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.initialSamplingOutputBufferIndex);
 }

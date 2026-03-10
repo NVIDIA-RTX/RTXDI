@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(RTXDI)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS ON)
 
@@ -37,6 +37,12 @@ option(DONUT_WITH_DX11 "" OFF)
 option(DONUT_WITH_VULKAN "" ON)
 option(DONUT_WITH_LZ4 "" OFF)
 option(DONUT_WITH_MINIZ "" OFF)
+option(DONUT_WITH_DLSS "" ON)
+
+# Setup NVAPI support
+option(NVRHI_WITH_NVAPI "Include NVAPI support (requires NVAPI SDK)" ON)
+set(NVAPI_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/NVAPI/" CACHE STRING "Path to NVAPI include headers/shaders" )
+set(NVAPI_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/External/NVAPI/amd64/nvapi64.lib" CACHE STRING "Path to NVAPI .lib file")
 
 # Helper to download and unzip a package from a URL
 # Uses a zero-length file to identify the version of the package
@@ -60,20 +66,20 @@ endfunction()
 
 # Download DXC
 if (WIN32)
-	CheckAndDownloadPackage("DXC" "v1.7.2212.1" ${CMAKE_CURRENT_SOURCE_DIR}/External/dxc https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2212.1/dxc_2023_03_01.zip)
-	set(REDIST_DXC "${CMAKE_CURRENT_SOURCE_DIR}/External/dxc/bin/x64/dxc.exe")
+	CheckAndDownloadPackage("DXC" "v1.8.2505.1" ${CMAKE_CURRENT_SOURCE_DIR}/External/dxc https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/dxc_2025_07_14.zip)
+	set(SHADERMAKE_DXC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/External/dxc/bin/x64/dxc.exe")
 else()
-	CheckAndDownloadPackage("DXC" "v1.7.2212.1" ${CMAKE_CURRENT_SOURCE_DIR}/External/dxc https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.7.2212.1/linux_dxc_2023_03_01.x86_64.tar.gz)
+	CheckAndDownloadPackage("DXC" "v1.8.2505.1" ${CMAKE_CURRENT_SOURCE_DIR}/External/dxc https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.8.2505.1/linux_dxc_2025_07_14.x86_64.tar.gz)
 	# Add execute permissions
 	file(CHMOD ${CMAKE_CURRENT_SOURCE_DIR}/External/dxc/bin/dxc PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
-	set(REDIST_DXC "${CMAKE_CURRENT_SOURCE_DIR}/External/dxc/bin/dxc")
+	set(SHADERMAKE_DXC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/External/dxc/bin/dxc")
 endif()
-if (EXISTS "${REDIST_DXC}")
+if (EXISTS "${SHADERMAKE_DXC_PATH}")
 	if (WIN32 AND NOT DXC_PATH)
-		set(DXC_PATH "${REDIST_DXC}" CACHE STRING "Path to DirectX Shader Compiler for DXIL output")
+		set(DXC_PATH "${SHADERMAKE_DXC_PATH}" CACHE STRING "Path to DirectX Shader Compiler for DXIL output")
 	endif()
 	if (NOT DXC_SPIRV_PATH)
-		set(DXC_SPIRV_PATH "${REDIST_DXC}" CACHE STRING "Path to DirectX Shader Compiler for SPIR-V output")
+		set(DXC_SPIRV_PATH "${SHADERMAKE_DXC_PATH}" CACHE STRING "Path to DirectX Shader Compiler for SPIR-V output")
 	endif()
 endif()
 # Have ShaderMake use included DXC
@@ -96,12 +102,12 @@ add_subdirectory(External/donut)
 set(DONUT_PATH "${CMAKE_CURRENT_LIST_DIR}/External/donut")
 
 include(External/NRD.cmake)
-include(External/DLSS.cmake)
 
 if (EXISTS "${CMAKE_CURRENT_LIST_DIR}/Libraries/Rtxdi/CMakeLists.txt")
 
     add_subdirectory(Libraries/Rtxdi)
     set(RTXDI_RUNTIME_INCLUDE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/Libraries/Rtxdi/Include")
+    set_target_properties(Rtxdi PROPERTIES FOLDER "RTXDI SDK")
 
 endif()
 
@@ -118,7 +124,11 @@ add_subdirectory(Samples/FullSample/Shaders)
 add_subdirectory(Samples/FullSample/Source)
 add_subdirectory(Samples/MinimalSample/Shaders)
 add_subdirectory(Samples/MinimalSample/Source)
+add_subdirectory(Support/Tests/FullSampleStructAlignmentTests)
 add_subdirectory(Support/Tests/RtxdiRuntimeShaderTests)
+add_subdirectory(Support/Tests/RtxdiRuntimeStructAlignmentTests)
+
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT FullSample)
 
 if (MSVC)
 	set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT FullSample)

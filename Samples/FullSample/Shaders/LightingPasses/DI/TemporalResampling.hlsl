@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
@@ -37,7 +39,7 @@ void RayGen()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 2);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, RTXDI_DI_TEMPORAL_RESAMPLING_RANDOM_SEED);
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
@@ -47,6 +49,9 @@ void RayGen()
         // Permutation sampling makes more noise on thin, high-detail objects.
         usePermutationSampling = !IsComplexSurface(pixelPosition, surface);
     }
+
+	RTXDI_DITemporalResamplingParameters tParams = g_Const.restirDI.temporalResamplingParams;
+	tParams.enablePermutationSampling = usePermutationSampling;
 
     RTXDI_DIReservoir temporalResult = RTXDI_EmptyDIReservoir();
     int2 temporalSamplePixelPos = -1;
@@ -59,27 +64,18 @@ void RayGen()
         float3 motionVector = t_MotionVectors[pixelPosition].xyz;
         motionVector = convertMotionVectorToPixelSpace(g_Const.view, g_Const.prevView, pixelPosition, motionVector);
 
-        RTXDI_DITemporalResamplingParameters tparams;
-        tparams.screenSpaceMotion = motionVector;
-        tparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.temporalResamplingInputBufferIndex;
-        tparams.maxHistoryLength = g_Const.restirDI.temporalResamplingParams.maxHistoryLength;
-        tparams.biasCorrectionMode = g_Const.restirDI.temporalResamplingParams.temporalBiasCorrection;
-        tparams.depthThreshold = g_Const.restirDI.temporalResamplingParams.temporalDepthThreshold;
-        tparams.normalThreshold = g_Const.restirDI.temporalResamplingParams.temporalNormalThreshold;
-        tparams.enableVisibilityShortcut = g_Const.restirDI.temporalResamplingParams.discardInvisibleSamples;
-        tparams.enablePermutationSampling = usePermutationSampling;
-        tparams.uniformRandomNumber = g_Const.restirDI.temporalResamplingParams.uniformRandomNumber;
+		uint sourceBufferIndex = g_Const.restirDI.bufferIndices.temporalResamplingInputBufferIndex;
 
         RAB_LightSample selectedLightSample = (RAB_LightSample)0;
         
         temporalResult = RTXDI_DITemporalResampling(pixelPosition, surface, curSample,
-            rng, params, g_Const.restirDI.reservoirBufferParams, tparams, temporalSamplePixelPos, selectedLightSample);
+            rng, params, g_Const.restirDI.reservoirBufferParams, motionVector, sourceBufferIndex, tParams, temporalSamplePixelPos, selectedLightSample);
     }
 
 #ifdef RTXDI_ENABLE_BOILING_FILTER
-    if (g_Const.restirDI.temporalResamplingParams.enableBoilingFilter)
+    if (g_Const.restirDI.boilingFilterParams.enableBoilingFilter)
     {
-        RTXDI_BoilingFilter(LocalIndex, g_Const.restirDI.temporalResamplingParams.boilingFilterStrength, temporalResult);
+        RTXDI_BoilingFilter(LocalIndex, g_Const.restirDI.boilingFilterParams.boilingFilterStrength, temporalResult);
     }
 #endif
 

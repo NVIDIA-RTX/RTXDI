@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma once
 
@@ -38,18 +40,34 @@ public:
     nvrhi::TextureHandle MotionVectors;
     nvrhi::TextureHandle NormalRoughness; // for NRD
 
+    nvrhi::TextureHandle PSRMotionVectors;
+    nvrhi::TextureHandle PSRNormalRoughness;
+    nvrhi::TextureHandle PSRDepth;
+    nvrhi::TextureHandle PSRHitT;
+    // PSR material/direction buffers (packed: R11G11B10 for albedo/F0, oct for view/light dir)
+    nvrhi::TextureHandle PSRDiffuseAlbedo;
+    nvrhi::TextureHandle PSRSpecularF0;
+    nvrhi::TextureHandle PSRLightDir;
+
     nvrhi::TextureHandle HdrColor;
     nvrhi::TextureHandle LdrColor;
     nvrhi::TextureHandle DiffuseLighting;
     nvrhi::TextureHandle SpecularLighting;
     nvrhi::TextureHandle DenoisedDiffuseLighting;
     nvrhi::TextureHandle DenoisedSpecularLighting;
+    nvrhi::TextureHandle NrdValidation;
     nvrhi::TextureHandle TaaFeedback1;
     nvrhi::TextureHandle TaaFeedback2;
     nvrhi::TextureHandle ResolvedColor;
     nvrhi::TextureHandle AccumulatedColor;
     nvrhi::TextureHandle RestirLuminance;
     nvrhi::TextureHandle PrevRestirLuminance;
+
+    nvrhi::TextureHandle DirectLightingRaw;
+    nvrhi::TextureHandle IndirectLightingRaw;
+
+    nvrhi::TextureHandle PTSampleIDTexture;
+    nvrhi::TextureHandle PTDuplicationMap;
 
     nvrhi::TextureHandle Gradients;
     nvrhi::TextureHandle TemporalSamplePositions;

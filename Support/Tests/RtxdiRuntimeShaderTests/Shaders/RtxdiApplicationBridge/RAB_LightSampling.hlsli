@@ -38,6 +38,11 @@ float RAB_GetGISampleTargetPdfForSurface(float3 samplePosition, float3 sampleRad
     return 0.0;
 }
 
+float3 RAB_GetPTSampleTargetPdfForSurface(float3 samplePosition, float3 sampleRadiance, RAB_Surface surface)
+{
+    return float3(0.0, 0.0, 0.0);
+}
+
 void RAB_GetLightDirDistance(RAB_Surface surface, RAB_LightSample lightSample,
     out float3 o_lightDir,
     out float o_lightDistance)
@@ -66,6 +71,8 @@ uint getLightIndex(uint instanceID, uint geometryIndex, uint primitiveIndex)
 bool RAB_TraceRayForLocalLight(float3 origin, float3 direction, float tMin, float tMax,
     out uint o_lightIndex, out float2 o_randXY)
 {
+	o_lightIndex = 0;
+	o_randXY = float2(0.0f, 0.0f);
     return true;
 }
 

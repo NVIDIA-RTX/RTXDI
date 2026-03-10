@@ -1,16 +1,18 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #include "CompositingPass.h"
 #include "../RenderTargets.h"
-#include "../SampleScene.h"
+#include "../Scene/Lights.h"
 #include "../UserInterface.h"
 
 #include <donut/engine/ShaderFactory.h>
@@ -23,7 +25,7 @@
 #include <utility>
 
 using namespace donut::math;
-#include "../../shaders/ShaderParameters.h"
+#include "SharedShaderInclude/ShaderParameters.h"
 
 using namespace donut::engine;
 
@@ -54,6 +56,8 @@ CompositingPass::CompositingPass(
         nvrhi::BindingLayoutItem::Texture_SRV(6),
         nvrhi::BindingLayoutItem::Texture_SRV(7),
         nvrhi::BindingLayoutItem::Texture_SRV(8),
+        nvrhi::BindingLayoutItem::Texture_SRV(9),
+        nvrhi::BindingLayoutItem::Texture_SRV(10),
         nvrhi::BindingLayoutItem::Texture_UAV(0),
         nvrhi::BindingLayoutItem::Texture_UAV(1),
         nvrhi::BindingLayoutItem::Sampler(0),
@@ -91,6 +95,8 @@ void CompositingPass::CreateBindingSet(const RenderTargets& renderTargets)
         nvrhi::BindingSetItem::Texture_SRV(6, renderTargets.SpecularLighting),
         nvrhi::BindingSetItem::Texture_SRV(7, renderTargets.DenoisedDiffuseLighting),
         nvrhi::BindingSetItem::Texture_SRV(8, renderTargets.DenoisedSpecularLighting),
+        nvrhi::BindingSetItem::Texture_SRV(9, renderTargets.PSRDiffuseAlbedo),
+        nvrhi::BindingSetItem::Texture_SRV(10, renderTargets.PSRSpecularF0),
         nvrhi::BindingSetItem::Texture_UAV(0, renderTargets.HdrColor),
         nvrhi::BindingSetItem::Texture_UAV(1, renderTargets.MotionVectors),
         nvrhi::BindingSetItem::Sampler(0, m_commonPasses->m_LinearWrapSampler),
@@ -128,9 +134,6 @@ void CompositingPass::Render(
     constants.environmentMapTextureIndex = (environmentLight.textureIndex >= 0) ? environmentLight.textureIndex : 0;
     constants.environmentScale = environmentLight.radianceScale.x;
     constants.environmentRotation = environmentLight.rotation;
-    constants.noiseMix = ui.noiseMix;
-    constants.noiseClampLow = ui.noiseClampLow;
-    constants.noiseClampHigh = ui.noiseClampHigh;
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     nvrhi::ComputeState state;

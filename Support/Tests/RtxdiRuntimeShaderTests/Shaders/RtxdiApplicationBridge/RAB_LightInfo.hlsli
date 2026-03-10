@@ -4,6 +4,8 @@
 #include "RAB_Surface.hlsli"
 #include "RAB_LightSample.hlsli"
 
+#define RAB_DISTANT_LIGHT_DISTANCE 0
+
 struct RAB_LightInfo
 {
     uint unused;

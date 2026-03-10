@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
@@ -14,7 +16,7 @@
 #include <donut/shaders/binding_helpers.hlsli>
 #include <donut/shaders/packing.hlsli>
 #include <Rtxdi/Utils/Math.hlsli>
-#include "ShaderParameters.h"
+#include "SharedShaderInclude/ShaderParameters.h"
 
 VK_PUSH_CONSTANT ConstantBuffer<PrepareLightsConstants> g_Const : register(b0);
 RWStructuredBuffer<PolymorphicLightInfo> u_LightDataBuffer : register(u0);

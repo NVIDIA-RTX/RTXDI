@@ -28,4 +28,9 @@ int RAB_TranslateLightIndex(uint lightIndex, bool currentToPrevious)
     return 0;
 }
 
+uint RAB_GetDuplicationMapCount(int2 prevPixelPos)
+{
+    return 0;
+}
+
 #endif // RAB_BUFFERS_GLSLI

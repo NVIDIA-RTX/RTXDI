@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2021-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2021-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
@@ -47,22 +49,14 @@ void RayGen()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 1);
-    RAB_RandomSamplerState tileRng = RAB_InitRandomSampler(pixelPosition / RTXDI_TILE_SIZE_IN_PIXELS, 1);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, RTXDI_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
+    RTXDI_RandomSamplerState tileRng = RTXDI_InitRandomSampler(pixelPosition / RTXDI_TILE_SIZE_IN_PIXELS, g_Const.runtimeParams.frameIndex, RTXDI_DI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
-    RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-        g_Const.restirDI.initialSamplingParams.numPrimaryLocalLightSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryInfiniteLightSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryEnvironmentSamples,
-        g_Const.restirDI.initialSamplingParams.numPrimaryBrdfSamples,
-        g_Const.restirDI.initialSamplingParams.brdfCutoff,
-        0.001f);
-
     RAB_LightSample lightSample;
     RTXDI_DIReservoir reservoir = RTXDI_SampleLightsForSurface(rng, tileRng, surface,
-        sampleParams, g_Const.lightBufferParams, g_Const.restirDI.initialSamplingParams.localLightSamplingMode,
+        g_Const.restirDI.initialSamplingParams, g_Const.lightBufferParams,
 #ifdef RTXDI_ENABLE_PRESAMPLING
         g_Const.localLightsRISBufferSegmentParams, g_Const.environmentLightRISBufferSegmentParams,
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_MODE_DISABLED
@@ -91,31 +85,15 @@ void RayGen()
         usePermutationSampling = !IsComplexSurface(pixelPosition, surface);
     }
 
-    RTXDI_DISpatioTemporalResamplingParameters stparams;
-    stparams.screenSpaceMotion = motionVector;
-    stparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.temporalResamplingInputBufferIndex;
-    stparams.maxHistoryLength = g_Const.restirDI.temporalResamplingParams.maxHistoryLength;
-    stparams.biasCorrectionMode = g_Const.restirDI.temporalResamplingParams.temporalBiasCorrection;
-    stparams.depthThreshold = g_Const.restirDI.temporalResamplingParams.temporalDepthThreshold;
-    stparams.normalThreshold = g_Const.restirDI.temporalResamplingParams.temporalNormalThreshold;
-    stparams.numSamples = g_Const.restirDI.spatialResamplingParams.numSpatialSamples + 1;
-    stparams.numDisocclusionBoostSamples = g_Const.restirDI.spatialResamplingParams.numDisocclusionBoostSamples;
-    stparams.samplingRadius = g_Const.restirDI.spatialResamplingParams.spatialSamplingRadius;
-    stparams.enableVisibilityShortcut = g_Const.restirDI.temporalResamplingParams.discardInvisibleSamples;
-    stparams.enablePermutationSampling = usePermutationSampling;
-    stparams.enableMaterialSimilarityTest = true;
-    stparams.uniformRandomNumber = g_Const.restirDI.temporalResamplingParams.uniformRandomNumber;
-    stparams.discountNaiveSamples = g_Const.discountNaiveSamples;
-
     reservoir = RTXDI_DISpatioTemporalResampling(pixelPosition, surface, reservoir,
-            rng, params, g_Const.restirDI.reservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
+            rng, motionVector, g_Const.restirDI.bufferIndices.temporalResamplingInputBufferIndex, params, g_Const.restirDI.reservoirBufferParams, g_Const.restirDI.spatioTemporalResamplingParams, temporalSamplePixelPos, lightSample);
 
     u_TemporalSamplePositions[GlobalIndex] = temporalSamplePixelPos;
 
 #ifdef RTXDI_ENABLE_BOILING_FILTER
-    if (g_Const.restirDI.temporalResamplingParams.enableBoilingFilter)
+    if (g_Const.restirDI.boilingFilterParams.enableBoilingFilter)
     {
-        RTXDI_BoilingFilter(LocalIndex, g_Const.restirDI.temporalResamplingParams.boilingFilterStrength, reservoir);
+        RTXDI_BoilingFilter(LocalIndex, g_Const.restirDI.boilingFilterParams.boilingFilterStrength, reservoir);
     }
 #endif
 
@@ -127,11 +105,11 @@ void RayGen()
     if (RTXDI_IsValidDIReservoir(reservoir))
     {
         // lightSample is produced by the RTXDI_SampleLightsForSurface and RTXDI_SpatioTemporalResampling calls above
-        ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
-            /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
+        ShadeSurfaceWithLightSample(reservoir, surface, g_Const.restirDI.shadingParams, lightSample,
+            /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, g_Const.restirDI.temporalResamplingParams.enableVisibilityShortcut, diffuse, specular, lightDistance);
 
         currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
-        
+
         specular = DemodulateSpecular(surface.material.specularF0, specular);
     }
 
@@ -148,6 +126,6 @@ void RayGen()
     }
 #endif
 
-    StoreShadingOutput(GlobalIndex, pixelPosition, 
+    StoreShadingOutput(GlobalIndex, pixelPosition,
         surface.viewDepth, surface.material.roughness,  diffuse, specular, lightDistance, true, g_Const.restirDI.shadingParams.enableDenoiserInputPacking);
 }

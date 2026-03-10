@@ -1,5 +1,30 @@
 # RTXDI SDK Change Log
 
+## 3.0.0
+
+**Release highlights:**
+
+- Added ReSTIR PT resampling functions to the runtime and their integration in the Full Sample application.
+- Added shader debug print for D3D12.
+- Added path tracer visualization tool.
+- Added Primary Surface Replacement (PSR) support for NRD integrations.
+- Added visualization tools for DI, GI, and PT reservoirs.
+
+**Breaking changes:**
+
+- The RTXDI_PathTracerContext interface uses a primitive #define-based interface for maximum compatibility and requires an additional preprocessor macro.
+
+**Fixed issues:**
+
+- Removed ghosting issues that appeared on recent drivers.
+
+**Misc improvements:**
+
+- Updated Donut
+- Updated NRD
+- DLSS integration replaced by Donut's DLSS integration
+- Added NVAPI for D3D12
+
 ## 2.3.0
 
 **Release highlights:**

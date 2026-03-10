@@ -1,3 +1,15 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
+
 #ifndef RAB_LIGHT_INFO_HLSLI
 #define RAB_LIGHT_INFO_HLSLI
 
@@ -6,6 +18,8 @@
 #include "RAB_LightSample.hlsli"
 
 typedef PolymorphicLightInfo RAB_LightInfo;
+
+#define RAB_DISTANT_LIGHT_DISTANCE DISTANT_LIGHT_DISTANCE
 
 RAB_LightInfo RAB_EmptyLightInfo()
 {
@@ -52,7 +66,7 @@ float RAB_GetLightTargetPdfForVolume(RAB_LightInfo light, float3 volumeCenter, f
 
 // Samples a polymorphic light relative to the given receiver surface.
 // For most light types, the "uv" parameter is just a pair of uniform random numbers, originally
-// produced by the RAB_GetNextRandom function and then stored in light reservoirs.
+// produced by the RTXDI_GetNextRandom function and then stored in light reservoirs.
 // For importance sampled environment lights, the "uv" parameter has the texture coordinates
 // in the PDF texture, normalized to the (0..1) range.
 RAB_LightSample RAB_SamplePolymorphicLight(RAB_LightInfo lightInfo, RAB_Surface surface, float2 uv)

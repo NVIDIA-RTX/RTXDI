@@ -41,7 +41,6 @@ between the bridge functions.
 #include "RAB_LightSample.hlsli"
 #include "RAB_LightSampling.hlsli"
 #include "RAB_Material.hlsli"
-#include "RAB_RandomSamplerState.hlsli"
 #include "RAB_RayPayload.hlsli"
 #include "RAB_RTShaders.hlsli"
 #include "RAB_SpatialHelpers.hlsli"

@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2023-2024, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
@@ -33,7 +35,7 @@ void RayGen()
 #endif
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, g_Const.runtimeParams.activeCheckerboardField);
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(GlobalIndex, 7);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(GlobalIndex, g_Const.runtimeParams.frameIndex, RTXDI_GI_TEMPORAL_RESAMPLING_RANDOM_SEED);
     
     const RAB_Surface primarySurface = RAB_GetGBufferSurface(pixelPosition, false);
     
@@ -44,30 +46,19 @@ void RayGen()
     motionVector = convertMotionVectorToPixelSpace(g_Const.view, g_Const.prevView, pixelPosition, motionVector);
 
     if (RAB_IsSurfaceValid(primarySurface)) {
-        RTXDI_GITemporalResamplingParameters tParams;
-
-        tParams.screenSpaceMotion = motionVector;
-        tParams.sourceBufferIndex = g_Const.restirGI.bufferIndices.temporalResamplingInputBufferIndex;
-        tParams.maxHistoryLength = g_Const.restirGI.temporalResamplingParams.maxHistoryLength;
-        tParams.biasCorrectionMode = g_Const.restirGI.temporalResamplingParams.temporalBiasCorrectionMode;
-        tParams.depthThreshold = g_Const.restirGI.temporalResamplingParams.depthThreshold;
-        tParams.normalThreshold = g_Const.restirGI.temporalResamplingParams.normalThreshold;
-        tParams.enablePermutationSampling = g_Const.restirGI.temporalResamplingParams.enablePermutationSampling;
-        tParams.enableFallbackSampling = g_Const.restirGI.temporalResamplingParams.enableFallbackSampling;
-        tParams.uniformRandomNumber = g_Const.restirGI.temporalResamplingParams.uniformRandomNumber;
+        RTXDI_GITemporalResamplingParameters tParams = g_Const.restirGI.temporalResamplingParams;
 
         // Age threshold should vary.
         // This is to avoid to die a bunch of GI reservoirs at once at a disoccluded area.
-        tParams.maxReservoirAge = g_Const.restirGI.temporalResamplingParams.maxReservoirAge * (0.5 + RAB_GetNextRandom(rng) * 0.5);
+        tParams.maxReservoirAge = g_Const.restirGI.temporalResamplingParams.maxReservoirAge * (0.5 + RTXDI_GetNextRandom(rng) * 0.5);
 
-        // Execute resampling.
-        reservoir = RTXDI_GITemporalResampling(pixelPosition, primarySurface, reservoir, rng, g_Const.runtimeParams, g_Const.restirGI.reservoirBufferParams, tParams);
+        reservoir = RTXDI_GITemporalResampling(pixelPosition, primarySurface, motionVector, g_Const.restirGI.bufferIndices.temporalResamplingInputBufferIndex, reservoir, rng, g_Const.runtimeParams, g_Const.restirGI.reservoirBufferParams, tParams);
     }
 
 #ifdef RTXDI_ENABLE_BOILING_FILTER
-    if (g_Const.restirGI.temporalResamplingParams.enableBoilingFilter)
+    if (g_Const.restirGI.boilingFilterParams.enableBoilingFilter)
     {
-        RTXDI_GIBoilingFilter(LocalIndex, g_Const.restirGI.temporalResamplingParams.boilingFilterStrength, reservoir);
+        RTXDI_GIBoilingFilter(LocalIndex, g_Const.restirGI.boilingFilterParams.boilingFilterStrength, reservoir);
     }
 #endif
 

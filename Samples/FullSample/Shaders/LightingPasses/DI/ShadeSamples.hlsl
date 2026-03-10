@@ -1,18 +1,21 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
 
 #include "Rtxdi/DI/Reservoir.hlsli"
+#include <Rtxdi/DI/ReservoirStorage.hlsli>
 
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
 #include "Rtxdi/ReGIR/ReGIRSampling.hlsli"
@@ -57,11 +60,11 @@ void RayGen()
         RAB_LightSample lightSample = RAB_SamplePolymorphicLight(lightInfo,
             surface, RTXDI_GetDIReservoirSampleUV(reservoir));
 
-        bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, lightSample,
-            /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, diffuse, specular, lightDistance);
-    
+        bool needToStore = ShadeSurfaceWithLightSample(reservoir, surface, g_Const.restirDI.shadingParams, lightSample,
+            /* previousFrameTLAS = */ false, /* enableVisibilityReuse = */ true, g_Const.restirDI.temporalResamplingParams.enableVisibilityShortcut, diffuse, specular, lightDistance);
+
         currLuminance = float2(calcLuminance(diffuse * surface.material.diffuseAlbedo), calcLuminance(specular));
-    
+
         specular = DemodulateSpecular(surface.material.specularF0, specular);
 
         if (needToStore)
@@ -73,7 +76,7 @@ void RayGen()
     // Store the sampled lighting luminance for the gradient pass.
     // Discard the pixels where the visibility was reused, as gradients need actual visibility.
     u_RestirLuminance[GlobalIndex] = currLuminance * (reservoir.age > 0 ? 0 : 1);
-    
+
 #if RTXDI_REGIR_MODE != RTXDI_REGIR_DISABLED
     if (g_Const.visualizeRegirCells)
     {
@@ -81,6 +84,11 @@ void RayGen()
     }
 #endif
 
-    StoreShadingOutput(GlobalIndex, pixelPosition, 
+    StoreShadingOutput(GlobalIndex, pixelPosition,
         surface.viewDepth, surface.material.roughness, diffuse, specular, lightDistance, true, g_Const.restirDI.shadingParams.enableDenoiserInputPacking);
+
+    if (g_Const.debug.outputDebugDirectLighting)
+    {
+        u_DirectLightingRaw[pixelPosition] = float4(diffuse + specular, 1.0);
+    }
 }

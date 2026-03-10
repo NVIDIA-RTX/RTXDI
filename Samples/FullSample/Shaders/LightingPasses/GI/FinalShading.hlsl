@@ -1,16 +1,19 @@
-/***************************************************************************
- # Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2023-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+#include "../../ShaderDebug/ShaderDebugPrint/ShaderDebugPrint.hlsli"
 #include "../ShadingHelpers.hlsli"
 
 #include <Rtxdi/GI/Reservoir.hlsli>
@@ -46,7 +49,7 @@ RTXDI_GIReservoir LoadInitialSampleReservoir(int2 reservoirPosition, RAB_Surface
     const float3 normal = octToNdirUnorm32(secondaryGBufferData.normal);
     const float3 throughput = Unpack_R16G16B16A16_FLOAT(secondaryGBufferData.throughputAndFlags).rgb;
 
-    // Note: the secondaryGBufferData.emission field contains the sampled radiance saved in ShadeSecondarySurfaces 
+    // Note: the secondaryGBufferData.emission field contains the sampled radiance saved in ShadeSecondarySurfaces
     return RTXDI_MakeGIReservoir(secondaryGBufferData.worldPos,
         normal, secondaryGBufferData.emission * throughput, secondaryGBufferData.pdf);
 }
@@ -67,11 +70,13 @@ void RayGen()
     if (any(pixelPosition > int2(g_Const.view.viewportSize)))
         return;
 
+    ShaderDebug::SetDebugShaderPrintCurrentThreadCursorXY(pixelPosition);
+
     const RAB_Surface primarySurface = RAB_GetGBufferSurface(pixelPosition, false);
-    
+
     const uint2 reservoirPosition = RTXDI_PixelPosToReservoirPos(pixelPosition, g_Const.runtimeParams.activeCheckerboardField);
     const RTXDI_GIReservoir reservoir = RTXDI_LoadGIReservoir(g_Const.restirGI.reservoirBufferParams, reservoirPosition, g_Const.restirGI.bufferIndices.secondarySurfaceReSTIRDIOutputBufferIndex);
-    
+
     float3 diffuse = 0;
     float3 specular = 0;
 
@@ -105,10 +110,10 @@ void RayGen()
 
             const float3 initialRadiance = initialReservoir.radiance * initialReservoir.weightSum;
 
-            diffuse = brdf.demodulatedDiffuse * radiance * finalWeight 
+            diffuse = brdf.demodulatedDiffuse * radiance * finalWeight
                     + brdf0.demodulatedDiffuse * initialRadiance * initialWeight;
 
-            specular = brdf.specular * radiance * finalWeight 
+            specular = brdf.specular * radiance * finalWeight
                      + brdf0.specular * initialRadiance * initialWeight;
         }
         else
@@ -116,11 +121,14 @@ void RayGen()
             diffuse = brdf.demodulatedDiffuse * radiance;
             specular = brdf.specular * radiance;
         }
-
-
         specular = DemodulateSpecular(primarySurface.material.specularF0, specular);
     }
 
-    StoreShadingOutput(GlobalIndex, pixelPosition, 
+    StoreShadingOutput(GlobalIndex, pixelPosition,
         primarySurface.viewDepth, primarySurface.material.roughness, diffuse, specular, 0, false, true);
+
+    if (g_Const.debug.outputDebugIndirectLighting)
+    {
+        u_IndirectLightingRaw[pixelPosition] = float4(diffuse + specular, 1.0);
+    }
 }

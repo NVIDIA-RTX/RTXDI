@@ -1,12 +1,14 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #include "RenderTargets.h"
 
@@ -15,7 +17,7 @@
 using namespace dm;
 using namespace donut;
 
-#include "../shaders/ShaderParameters.h"
+#include "SharedShaderInclude/ShaderParameters.h"
 
 RenderTargets::RenderTargets(nvrhi::IDevice* device, int2 size)
     : Size(size)
@@ -56,6 +58,9 @@ RenderTargets::RenderTargets(nvrhi::IDevice* device, int2 size)
     Depth = device->createTexture(desc);
     desc.debugName = "PrevDepthBuffer";
     PrevDepth = device->createTexture(desc);
+    desc.clearValue = 0.f;
+    desc.debugName = "PRSDepthBuffer";
+    PSRDepth = device->createTexture(desc);
 
     desc.useClearValue = false;
     desc.clearValue = 0.f;
@@ -91,6 +96,16 @@ RenderTargets::RenderTargets(nvrhi::IDevice* device, int2 size)
     desc.format = nvrhi::Format::RGBA8_UNORM;
     desc.debugName = "NormalRoughness";
     NormalRoughness = device->createTexture(desc);
+    desc.debugName = "PSRNormalRoughness";
+    desc.useClearValue = true;
+    PSRNormalRoughness = device->createTexture(desc);
+    desc.useClearValue = false;
+
+    desc.format = nvrhi::Format::R32_FLOAT;
+    desc.debugName = "PSRHitT";
+    desc.useClearValue = true;
+    PSRHitT = device->createTexture(desc);
+    desc.useClearValue = false;
 
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.debugName = "GBufferEmissive";
@@ -99,6 +114,23 @@ RenderTargets::RenderTargets(nvrhi::IDevice* device, int2 size)
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.debugName = "MotionVectors";
     MotionVectors = device->createTexture(desc);
+    desc.debugName = "PSRMotionVectors";
+    PSRMotionVectors = device->createTexture(desc);
+
+    // PSR material/direction: packed uint (R11G11B10 for albedo/F0, oct-encoded for directions)
+    desc.format = nvrhi::Format::R32_UINT;
+    desc.debugName = "PSRDiffuseAlbedo";
+    desc.useClearValue = true;
+    PSRDiffuseAlbedo = device->createTexture(desc);
+    desc.debugName = "PSRSpecularF0";
+    PSRSpecularF0 = device->createTexture(desc);
+    desc.debugName = "PSRLightDir";
+    PSRLightDir = device->createTexture(desc);
+    desc.useClearValue = false;
+    desc.debugName = "PTSampleIDTexture";
+    PTSampleIDTexture = device->createTexture(desc);
+    desc.debugName = "PTDuplicationMap";
+    PTDuplicationMap = device->createTexture(desc);
 
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.debugName = "ResolvedColor";
@@ -107,6 +139,15 @@ RenderTargets::RenderTargets(nvrhi::IDevice* device, int2 size)
     desc.format = nvrhi::Format::RGBA16_FLOAT;
     desc.debugName = "ReferenceColor";
     ReferenceColor = device->createTexture(desc);
+
+    // Debug render targets
+    desc.format = nvrhi::Format::RGBA16_FLOAT;
+    desc.debugName = "DirectLightingRaw";
+    DirectLightingRaw = device->createTexture(desc);
+
+    desc.format = nvrhi::Format::RGBA16_FLOAT;
+    desc.debugName = "IndirectLightingRaw";
+    IndirectLightingRaw = device->createTexture(desc);
 
     GBufferFramebuffer = std::make_shared<engine::FramebufferFactory>(device);
     GBufferFramebuffer->DepthTarget = DeviceDepth;
@@ -155,6 +196,10 @@ RenderTargets::RenderTargets(nvrhi::IDevice* device, int2 size)
     desc.debugName = "DenoisedSpecularLighting";
     DenoisedSpecularLighting = device->createTexture(desc);
 
+    desc.format = nvrhi::Format::RGBA8_UNORM;
+    desc.debugName = "NrdValidation";
+    NrdValidation = device->createTexture(desc);
+
     desc.format = nvrhi::Format::RGBA16_SNORM;
     desc.debugName = "TaaFeedback1";
     TaaFeedback1 = device->createTexture(desc);
@@ -200,10 +245,11 @@ RenderTargets::RenderTargets(nvrhi::IDevice* device, int2 size)
     nvrhi::TextureDesc debugDesc;
     debugDesc.width = size.x;
     debugDesc.height = size.y;
-    debugDesc.keepInitialState = false;
+    debugDesc.keepInitialState = true;
     debugDesc.isUAV = true;
     debugDesc.isRenderTarget = false;
     debugDesc.initialState = nvrhi::ResourceStates::UnorderedAccess;
+    debugDesc.initialState = nvrhi::ResourceStates::Common;
     debugDesc.format = nvrhi::Format::RGBA16_FLOAT;
     debugDesc.debugName = "DebugColor";
     DebugColor = device->createTexture(debugDesc);

@@ -4,15 +4,15 @@
 [submodule "NRD"]
 	path = External/NRD
 	url = https://github.com/NVIDIA-RTX/NRD.git
-[submodule "DLSS"]
-	path = External/DLSS
-	url = https://github.com/NVIDIA/DLSS.git
 [submodule "rtxdi-runtime"]
 	path = Libraries/Rtxdi
-	url = https://github.com/NVIDIA-RTX/RTXDI-Library.git
+	url = https://github.com/NVIDIA-RTX/RTXDI-Library
 [submodule "thirdparty/cxxopts"]
 	path = External/cxxopts
 	url = https://github.com/jarro2783/cxxopts.git
 [submodule "Assets/Media"]
 	path = Assets/Media
-	url = https://github.com/NVIDIA-RTX/RTXDI-Assets.git
+	url = https://github.com/NVIDIA-RTX/RTXDI-Assets
+[submodule "External/NVAPI"]
+	path = External/NVAPI
+	url = https://github.com/NVIDIA/nvapi.git

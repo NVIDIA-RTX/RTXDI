@@ -1,16 +1,18 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #include "GlassPass.h"
 #include "../RenderTargets.h"
-#include "../SampleScene.h"
+#include "../Scene/Lights.h"
 
 #include <donut/engine/CommonRenderPasses.h>
 #include <donut/engine/ShaderFactory.h>
@@ -20,7 +22,7 @@
 #include "../Profiler.h"
 
 using namespace donut::math;
-#include "../../shaders/ShaderParameters.h"
+#include "SharedShaderInclude/ShaderParameters.h"
 
 using namespace donut::engine;
 
@@ -49,6 +51,8 @@ GlassPass::GlassPass(
         nvrhi::BindingLayoutItem::StructuredBuffer_SRV(2),
         nvrhi::BindingLayoutItem::StructuredBuffer_SRV(3),
         nvrhi::BindingLayoutItem::Texture_SRV(4),
+        nvrhi::BindingLayoutItem::Texture_SRV(5),
+        nvrhi::BindingLayoutItem::Texture_SRV(6),
         nvrhi::BindingLayoutItem::Sampler(0),
         nvrhi::BindingLayoutItem::Sampler(1),
         nvrhi::BindingLayoutItem::Texture_UAV(0),
@@ -79,6 +83,8 @@ void GlassPass::CreateBindingSet(
             nvrhi::BindingSetItem::StructuredBuffer_SRV(2, m_scene->GetGeometryBuffer()),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(3, m_scene->GetMaterialBuffer()),
             nvrhi::BindingSetItem::Texture_SRV(4, renderTargets.GBufferEmissive),
+            nvrhi::BindingSetItem::Texture_SRV(5, renderTargets.GBufferDiffuseAlbedo),
+            nvrhi::BindingSetItem::Texture_SRV(6, renderTargets.GBufferSpecularRough),
             nvrhi::BindingSetItem::Sampler(0, m_commonPasses->m_LinearWrapSampler),
             nvrhi::BindingSetItem::Sampler(1, m_commonPasses->m_LinearWrapSampler),
             nvrhi::BindingSetItem::Texture_UAV(0, renderTargets.HdrColor),
@@ -102,7 +108,8 @@ void GlassPass::Render(
     const EnvironmentLight& environmentLight,
     float normalMapScale,
     bool enableMaterialReadback,
-    dm::int2 materialReadbackPosition)
+    dm::int2 materialReadbackPosition,
+    IndirectLightingMode indirectLightingMode)
 {
     commandList->beginMarker("Glass");
 
@@ -115,6 +122,7 @@ void GlassPass::Render(
     constants.normalMapScale = normalMapScale;
     constants.materialReadbackBufferIndex = ProfilerSection::MaterialReadback * 2;
     constants.materialReadbackPosition = enableMaterialReadback ? materialReadbackPosition : int2(-1, -1);
+    constants.indirectLightingMode = indirectLightingMode;
     commandList->writeBuffer(m_constantBuffer, &constants, sizeof(constants));
 
     PerPassConstants pushConstants{};

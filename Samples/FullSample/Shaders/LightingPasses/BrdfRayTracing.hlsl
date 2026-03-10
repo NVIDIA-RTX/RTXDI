@@ -1,18 +1,23 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
 #include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+#include "../ShaderDebug/ShaderDebugPrint/ShaderDebugPrint.hlsli"
+#include "../ShaderDebug/PTPathViz/PTPathVizRecording.hlsli"
 
 #include <Rtxdi/DI/Reservoir.hlsli>
+#include <Rtxdi/Utils/ReservoirAddressing.hlsli>
 
 #ifdef WITH_NRD
 #define NRD_HEADER_ONLY
@@ -41,8 +46,20 @@ void RayGen()
     if (!RAB_IsSurfaceValid(surface))
         return;
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(GlobalIndex, 5);
-    
+	ShaderDebug::SetDebugShaderPrintCurrentThreadCursorXY(pixelPosition);
+
+    if(all(pixelPosition == g_Const.debug.mouseSelectedPixel))
+    {
+        Debug_EnablePTPathRecording();
+    }
+    Debug_RecordPTCameraPosition(g_Const.view.cameraDirectionOrPosition.xyz);
+    Debug_SetPTVertexIndex(1);
+    Debug_RecordPTIntersectionPosition(RAB_GetSurfaceWorldPos(surface));
+    Debug_RecordPTIntersectionNormal(RAB_GetSurfaceNormal(surface));
+    Debug_RecordPTNEELightPosition(RAB_GetSurfaceWorldPos(surface));
+
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(GlobalIndex, g_Const.runtimeParams.frameIndex, RTXDI_GI_GENERATE_INITIAL_SAMPLES_RANDOM_SEED);
+
     float3 tangent, bitangent;
     branchlessONB(surface.normal, tangent, bitangent);
 
@@ -50,16 +67,16 @@ void RayGen()
 
     RayDesc ray;
     ray.TMin = 0.001f * distance;
-    ray.TMax = 1000;
+    ray.TMax = 1000.0;
 
     float2 Rand;
-    Rand.x = RAB_GetNextRandom(rng);
-    Rand.y = RAB_GetNextRandom(rng);
+    Rand.x = RTXDI_GetNextRandom(rng);
+    Rand.y = RTXDI_GetNextRandom(rng);
 
     float3 V = normalize(g_Const.view.cameraDirectionOrPosition.xyz - surface.worldPos);
 
     bool isSpecularRay = false;
-    bool isDeltaSurface = surface.material.roughness == 0;
+    bool isDeltaSurface = surface.material.roughness < kMinRoughness;
     float specular_PDF;
     float3 BRDF_over_PDF;
     float overall_PDF;
@@ -89,10 +106,11 @@ void RayGen()
             diffuse_BRDF_over_PDF = 1.0;
         }
 
+		// Ignores PDF of specular or diffuse
+		// Chooses PDF based on relative luminance
         specular_PDF = saturate(calcLuminance(specular_BRDF_over_PDF) /
             calcLuminance(specular_BRDF_over_PDF + diffuse_BRDF_over_PDF * surface.material.diffuseAlbedo));
-
-        isSpecularRay = RAB_GetNextRandom(rng) < specular_PDF;
+        isSpecularRay = RTXDI_GetNextRandom(rng) < specular_PDF;
 
         if (isSpecularRay)
         {
@@ -105,6 +123,7 @@ void RayGen()
             BRDF_over_PDF = diffuse_BRDF_over_PDF / (1.0 - specular_PDF);
         }
 
+		// Calculates PDF of individual respective lobes.
         const float specularLobe_PDF = ImportanceSampleGGX_VNDF_PDF(surface.material.roughness, surface.normal, V, ray.Direction);
         const float diffuseLobe_PDF = saturate(dot(ray.Direction, surface.normal)) / c_pi;
 
@@ -121,13 +140,13 @@ void RayGen()
     ray.Origin = surface.worldPos;
 
     float3 radiance = 0;
-    
-    RayPayload payload = (RayPayload)0;
+
+    RAB_RayPayload payload = (RAB_RayPayload)0;
     payload.instanceID = ~0u;
     payload.throughput = 1.0;
 
     uint instanceMask = INSTANCE_MASK_OPAQUE;
-    
+
     if (g_Const.sceneConstants.enableAlphaTestedGeometry)
         instanceMask |= INSTANCE_MASK_ALPHA_TESTED;
 
@@ -136,7 +155,7 @@ void RayGen()
 
 #if USE_RAY_QUERY
     RayQuery<RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> rayQuery;
-    
+
     rayQuery.TraceRayInline(SceneBVH, RAY_FLAG_NONE, instanceMask, ray);
 
     while (rayQuery.Proceed())
@@ -173,8 +192,8 @@ void RayGen()
     }
 
     uint gbufferIndex = RTXDI_ReservoirPositionToPointer(g_Const.restirGI.reservoirBufferParams, GlobalIndex, 0);
-    
-    struct 
+
+    struct
     {
         float3 position;
         float3 normal;
@@ -203,7 +222,7 @@ void RayGen()
             payload.barycentrics,
             GeomAttr_Normal | GeomAttr_TexCoord | GeomAttr_Position,
             t_InstanceData, t_GeometryData, t_MaterialConstants);
-        
+
         MaterialSample ms = sampleGeometryMaterial(gs, 0, 0, 0,
             MatAttr_BaseColor | MatAttr_Emissive | MatAttr_MetalRough, s_MaterialSampler);
 
@@ -272,10 +291,10 @@ void RayGen()
             // GI reservoir sample in ShadeSecondarySurface.hlsl. It need to be stored separately.
             secondaryGBufferData.emission = radiance;
             radiance = 0;
-            
+
             secondaryGBufferData.pdf = overall_PDF;
         }
-        
+
         uint flags = 0;
         if (isSpecularRay) flags |= kSecondaryGBuffer_IsSpecularRay;
         if (isDeltaSurface) flags |= kSecondaryGBuffer_IsDeltaSurface;
@@ -285,7 +304,11 @@ void RayGen()
         u_SecondaryGBuffer[gbufferIndex] = secondaryGBufferData;
     }
 
-    if (any(radiance > 0) || !g_Const.enableBrdfAdditiveBlend)
+    Debug_SetPTVertexIndex(2);
+    Debug_RecordPTIntersectionPosition(secondarySurface.position);
+    Debug_RecordPTIntersectionNormal(secondarySurface.normal);
+
+    if ((any(radiance > 0) || !g_Const.enableBrdfAdditiveBlend))
     {
         radiance *= payload.throughput;
 
@@ -296,8 +319,13 @@ void RayGen()
 
         specular = DemodulateSpecular(surface.material.specularF0, specular);
 
-
-        StoreShadingOutput(GlobalIndex, pixelPosition,
-            surface.viewDepth, surface.material.roughness, diffuse, specular, payload.committedRayT, !g_Const.enableBrdfAdditiveBlend, !g_Const.enableBrdfIndirect);
+        if(!isDeltaSurface)
+            StoreShadingOutput(GlobalIndex, pixelPosition,
+                surface.viewDepth, surface.material.roughness, diffuse, specular, payload.committedRayT, !g_Const.enableBrdfAdditiveBlend, !g_Const.enableBrdfIndirect);
+        else
+        {
+            StoreShadingOutput(GlobalIndex, pixelPosition,
+                surface.viewDepth, surface.material.roughness, 0, 0, 0, !g_Const.enableBrdfAdditiveBlend, !g_Const.enableBrdfIndirect);
+        }
     }
 }

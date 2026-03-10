@@ -14,6 +14,7 @@
 #include "RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
 
 #include <Rtxdi/DI/InitialSampling.hlsli>
+#include <Rtxdi/DI/ReservoirStorage.hlsli>
 #include <Rtxdi/DI/SpatioTemporalResampling.hlsli>
 
 #include "PrimaryRays.hlsli"
@@ -38,26 +39,20 @@ void main(uint2 pixelPosition : SV_DispatchThreadID)
     if (RAB_IsSurfaceValid(primary.surface))
     {
         // Initialize the RNG
-        RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 1);
-        
-        RTXDI_SampleParameters sampleParams = RTXDI_InitSampleParameters(
-            g_Const.numInitialSamples, // local light samples 
-            0, // infinite light samples
-            0, // environment map samples
-            g_Const.numInitialBRDFSamples,
-            g_Const.brdfCutoff,
-            0.001f);
+        RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, 1);
 
+		RTXDI_InitialSamplingMisData misData = RTXDI_ComputeInitialSamplingMisData(g_Const.initialSamplingParams);
+        
         // Generate the initial sample
         RAB_LightSample lightSample = RAB_EmptyLightSample();
         RTXDI_DIReservoir localReservoir = RTXDI_SampleLocalLights(rng, rng, primary.surface,
-            sampleParams, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
+            g_Const.initialSamplingParams, misData, ReSTIRDI_LocalLightSamplingMode_UNIFORM, lightBufferParams.localLightBufferRegion, lightSample);
         RTXDI_CombineDIReservoirs(reservoir, localReservoir, 0.5, localReservoir.targetPdf);
 
         // Resample BRDF samples.
         RAB_LightSample brdfSample = RAB_EmptyLightSample();
-        RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, primary.surface, sampleParams, lightBufferParams, brdfSample);
-        bool selectBrdf = RTXDI_CombineDIReservoirs(reservoir, brdfReservoir, RAB_GetNextRandom(rng), brdfReservoir.targetPdf);
+        RTXDI_DIReservoir brdfReservoir = RTXDI_SampleBrdf(rng, primary.surface, g_Const.initialSamplingParams.numBrdfSamples, g_Const.initialSamplingParams.brdfCutoff, 0.001f, misData, rng, lightBufferParams, brdfSample);
+        bool selectBrdf = RTXDI_CombineDIReservoirs(reservoir, brdfReservoir, RTXDI_GetNextRandom(rng), brdfReservoir.targetPdf);
         if (selectBrdf)
         {
             lightSample = brdfSample;
@@ -80,29 +75,13 @@ void main(uint2 pixelPosition : SV_DispatchThreadID)
         // Apply spatio-temporal resampling, if enabled
         if (g_Const.enableResampling)
         {
-            // Fill out the parameter structure.
-            // Mostly use literal constants for simplicity.
-            RTXDI_DISpatioTemporalResamplingParameters stparams;
-            stparams.screenSpaceMotion = primary.motionVector;
-            stparams.sourceBufferIndex = g_Const.inputBufferIndex;
-            stparams.maxHistoryLength = 20;
-            stparams.biasCorrectionMode = g_Const.unbiasedMode ? RTXDI_BIAS_CORRECTION_RAY_TRACED : RTXDI_BIAS_CORRECTION_BASIC;
-            stparams.depthThreshold = 0.1;
-            stparams.normalThreshold = 0.5;
-            stparams.numSamples = g_Const.numSpatialSamples + 1;
-            stparams.numDisocclusionBoostSamples = 0;
-            stparams.samplingRadius = 32;
-            stparams.enableVisibilityShortcut = true;
-            stparams.enablePermutationSampling = true;
-            stparams.discountNaiveSamples = false;
-
             // This variable will receive the position of the sample reused from the previous frame.
             // It's only needed for gradient evaluation, ignore it here.
             int2 temporalSamplePixelPos = -1;
 
             // Call the resampling function, update the reservoir and lightSample variables
             reservoir = RTXDI_DISpatioTemporalResampling(pixelPosition, primary.surface, reservoir,
-                    rng, g_Const.runtimeParams, g_Const.restirDIReservoirBufferParams, stparams, temporalSamplePixelPos, lightSample);
+                    rng, primary.motionVector, g_Const.inputBufferIndex, g_Const.runtimeParams, g_Const.restirDIReservoirBufferParams, g_Const.spatioTemporalResamplingParams, temporalSamplePixelPos, lightSample);
         }
 
         float3 shadingOutput = 0;

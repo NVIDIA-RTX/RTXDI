@@ -1,16 +1,19 @@
-/***************************************************************************
- # Copyright (c) 2020-2023, NVIDIA CORPORATION.  All rights reserved.
- #
- # NVIDIA CORPORATION and its licensors retain all intellectual property
- # and proprietary rights in and to this software, related documentation
- # and any modifications thereto.  Any use, reproduction, disclosure or
- # distribution of this software and related documentation without an express
- # license agreement from NVIDIA CORPORATION is strictly prohibited.
- **************************************************************************/
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2020-2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ *
+ * NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+ * property and proprietary rights in and to this material, related
+ * documentation and any modifications thereto. Any use, reproduction,
+ * disclosure or distribution of this material and related documentation
+ * without an express license agreement from NVIDIA CORPORATION or
+ * its affiliates is strictly prohibited.
+ */
 
 #pragma pack_matrix(row_major)
 
 #include "../RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli"
+#include "../ShaderDebug/ShaderDebugPrint/ShaderDebugPrint.hlsli"
 
 #include <Rtxdi/DI/SpatialResampling.hlsli>
 
@@ -30,7 +33,7 @@ void RayGen()
 
     uint2 pixelPosition = RTXDI_ReservoirPosToPixelPos(GlobalIndex, params.activeCheckerboardField);
 
-    RAB_RandomSamplerState rng = RAB_InitRandomSampler(pixelPosition, 3);
+    RTXDI_RandomSamplerState rng = RTXDI_InitRandomSampler(pixelPosition, g_Const.runtimeParams.frameIndex, RTXDI_DI_SPATIAL_RESAMPLING_RANDOM_SEED);
 
     RAB_Surface surface = RAB_GetGBufferSurface(pixelPosition, false);
 
@@ -41,21 +44,10 @@ void RayGen()
         RTXDI_DIReservoir centerSample = RTXDI_LoadDIReservoir(g_Const.restirDI.reservoirBufferParams,
             GlobalIndex, g_Const.restirDI.bufferIndices.spatialResamplingInputBufferIndex);
 
-        RTXDI_DISpatialResamplingParameters sparams;
-        sparams.sourceBufferIndex = g_Const.restirDI.bufferIndices.spatialResamplingInputBufferIndex;
-        sparams.numSamples = g_Const.restirDI.spatialResamplingParams.numSpatialSamples;
-        sparams.numDisocclusionBoostSamples = g_Const.restirDI.spatialResamplingParams.numDisocclusionBoostSamples;
-        sparams.targetHistoryLength = g_Const.restirDI.temporalResamplingParams.maxHistoryLength;
-        sparams.biasCorrectionMode = g_Const.restirDI.spatialResamplingParams.spatialBiasCorrection;
-        sparams.samplingRadius = g_Const.restirDI.spatialResamplingParams.spatialSamplingRadius;
-        sparams.depthThreshold = g_Const.restirDI.spatialResamplingParams.spatialDepthThreshold;
-        sparams.normalThreshold = g_Const.restirDI.spatialResamplingParams.spatialNormalThreshold;
-        sparams.enableMaterialSimilarityTest = true;
-        sparams.discountNaiveSamples = g_Const.restirDI.spatialResamplingParams.discountNaiveSamples;
-
+		uint sourceBufferIndex = g_Const.restirDI.bufferIndices.spatialResamplingInputBufferIndex;
         RAB_LightSample lightSample = (RAB_LightSample)0;
         spatialResult = RTXDI_DISpatialResampling(pixelPosition, surface, centerSample, 
-             rng, params, g_Const.restirDI.reservoirBufferParams, sparams, lightSample);
+             rng, params, g_Const.restirDI.reservoirBufferParams, sourceBufferIndex, g_Const.restirDI.spatialResamplingParams, lightSample);
     }
 
     RTXDI_StoreDIReservoir(spatialResult, g_Const.restirDI.reservoirBufferParams, GlobalIndex, g_Const.restirDI.bufferIndices.spatialResamplingOutputBufferIndex);
