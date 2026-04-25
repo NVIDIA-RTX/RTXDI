@@ -177,8 +177,8 @@ void volume_restir_pass(ivec3 threadIndex)
 
   // Calculate a froxel coordinate sampling offset for the current froxel
 
-  const f16vec3 randomSample = f16vec3(RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState));
-  const f16vec3 currentFroxelCoordinateOffset = calcUniformCenteredCubePositionSample(randomSample);
+  const float3 randomSample = float3(RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState));
+  const float3 currentFroxelCoordinateOffset = calcUniformCenteredCubePositionSample(randomSample);
   
   // Note: Jittered by coordinate offset which samples outwards from the center of the froxel cell uniformly (though will translate
   // to a slightly nonuniform sampling pattern in worldspace).
@@ -199,14 +199,14 @@ void volume_restir_pass(ivec3 threadIndex)
 
   // Todo: Improve with some way to construct a volume ray direction manually from a position?
   Ray ray;
-  ray.coneRadius = float16_t(0.0f);
-  ray.spreadAngle = float16_t(cb.screenSpacePixelSpreadHalfAngle);
+  ray.coneRadius = 0.0f;
+  ray.spreadAngle = cb.screenSpacePixelSpreadHalfAngle;
 
   // Create a Ray Interaction for the current froxel
 
   // Todo: Improve with some way to construct a volume hit manually like this
   MinimalRayInteraction minimalRayInteraction;
-  minimalRayInteraction.coneRadius = ray.coneRadius + float16_t(ray.spreadAngle * currentFroxelDistance);
+  minimalRayInteraction.coneRadius = ray.coneRadius + ray.spreadAngle * currentFroxelDistance;
 
   // Create a Volume Interaction for the current froxel
 
@@ -248,13 +248,13 @@ void volume_restir_pass(ivec3 threadIndex)
     
     // Note: Currently set to the invalid Ray Portal index until we support cross-portal lighting here.
     uint8_t sampledTransportPortalIndex = RTXDI_INVALID_PORTAL_INDEX;
-    float16_t3 attenuation = float16_t3(0.0f);
+    float3 attenuation = float3(0.0f);
     const bool visible = lightSampleValid && RAB_VolumeReSTIR_TraceNEEVisibility(
       rabLightSample, sampledTransportPortalIndex,
       rabVolumeVisibilityContext, rabVolumeInteraction, attenuation);
   
     // Update the reservoir if we know the sample to be visible here.
-    currentVolumeReservoir.knownVisible = visible && any(attenuation > float16_t3(0.0f));
+    currentVolumeReservoir.knownVisible = visible && any(attenuation > float3(0.0f));
   }
   
   // Write out the reservoir containing initial sample and conservative visibility info

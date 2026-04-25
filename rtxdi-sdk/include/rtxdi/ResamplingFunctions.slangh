@@ -171,8 +171,8 @@ void RTXDI_SampleRandomLights(
   bool testVisibility)
 {
   // Get importance sampling parameters for portals, assume <= 4 portals
-  float16_t totalPortalPdf;
-  float16_t4 sampleThreshold;
+  float totalPortalPdf;
+  float4 sampleThreshold;
   RAB_GetPortalSamplingProbablity(surface, totalPortalPdf, sampleThreshold);
 
   RAB_LightSample selectedSample = RAB_EmptyLightSample();
@@ -225,7 +225,7 @@ void RTXDI_SampleRandomLights(
           if (randPortal < sampleThreshold[i])
           {
             portalIdx = i;
-            float16_t portalPdf = (i == 0) ? sampleThreshold[0] : sampleThreshold[i] - sampleThreshold[i-1];
+            float portalPdf = (i == 0) ? sampleThreshold[0] : sampleThreshold[i] - sampleThreshold[i-1];
             invSourcePdf /= portalPdf;
             break;
           }
@@ -1568,10 +1568,10 @@ VolumeReSTIR_Reservoir VolumeReSTIR_SpatialResampling(inout RAB_RandomSamplerSta
           {
             // Note: Currently set to the invalid Ray Portal index until we support cross-portal lighting here.
             uint8_t sampledTransportPortalIndex = RTXDI_INVALID_PORTAL_INDEX;
-            float16_t3 attenuation = float16_t3(0.0f);
+            float3 attenuation = float3(0.0f);
             const bool visible = RAB_VolumeReSTIR_TraceNEEVisibility(selectedSampleAtNeighbour, sampledTransportPortalIndex, rabVolumeVisibilityContext, rabNeighbourVolumeInteraction, attenuation);
       
-            if (!visible || all(attenuation <= float16_t3(0.0f)))
+            if (!visible || all(attenuation <= float3(0.0f)))
             {
               ps = 0.f;
             }
@@ -1649,10 +1649,10 @@ VolumeReSTIR_Reservoir VolumeReSTIR_TemporalResampling(inout RAB_RandomSamplerSt
       {
         // Note: Currently set to the invalid Ray Portal index until we support cross-portal lighting here.
         uint8_t sampledTransportPortalIndex = RTXDI_INVALID_PORTAL_INDEX;
-        float16_t3 attenuation = float16_t3(0.0f);
+        float3 attenuation = float3(0.0f);
         const bool visible = RAB_VolumeReSTIR_TraceNEEVisibility(selectedSampleAtTemporal, sampledTransportPortalIndex, rabVolumeVisibilityContext, rabPrevVolumeInteraction, attenuation);
       
-        if (!visible || all(attenuation <= float16_t3(0.0f)))
+        if (!visible || all(attenuation <= float3(0.0f)))
         {
           temporalP = 0.f;
         }
@@ -1712,7 +1712,7 @@ VolumeReSTIR_Reservoir VolumeReSTIR_SampleLightRIS(
     {
       // Sample the light
 
-      const float16_t2 risSampleCoordinates = float16_t2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng));
+      const float2 risSampleCoordinates = float2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng));
       const uint offsetLightIndex = uint(lightIndex) + range.firstIndex;
       // Note: lightType comes from the loop and is provided as a hint so that the compiler
       // can effectively unroll the loop and remove the switch from decodedPolymorphicLightSampleArea called within.

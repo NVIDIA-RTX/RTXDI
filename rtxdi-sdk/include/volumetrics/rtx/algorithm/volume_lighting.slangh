@@ -312,7 +312,7 @@ float3 calculateJitteredFroxelUvw(VolumeArgs volumeArgs, float3 froxelUvw, float
 // was generated with respect to some sort of camera-centric ray casts such that matrix jittering (from DLSS or TAA) affects it.
 vec3 evalVolumetricNEE(
   Sampler3D<float4> volumeFilteredRadianceY, Sampler3D<float2> volumeFilteredRadianceCoCg, VolumeArgs volumeArgs,
-  MinimalSurfaceInteraction surfaceInteraction, f16vec3 direction,
+  MinimalSurfaceInteraction surfaceInteraction, float3 direction,
   uint froxelVolumeHint = 0, bool phaseFunction = false, float anisotropy = 0.f)
 {
   if (froxelVolumeHint >= volumeArgs.numActiveFroxelVolumes)

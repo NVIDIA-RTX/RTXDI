@@ -257,12 +257,12 @@ struct VolumeReSTIR_LightSample
   // Cached here for future use (only needed for bias correction, not currently used much right now).
   float targetPdf = 0.f;
 
-  static VolumeReSTIR_LightSample create(uint16_t lightIndex, float16_t2 lightSampleCoordinates, float targetPdf)
+  static VolumeReSTIR_LightSample create(uint16_t lightIndex, float2 lightSampleCoordinates, float targetPdf)
   {
     VolumeReSTIR_LightSample newVolumeLightSample;
 
     newVolumeLightSample.lightIndex = lightIndex;
-    newVolumeLightSample.lightSampleCoordinates = lightSampleCoordinates;
+    newVolumeLightSample.lightSampleCoordinates = float16_t2(lightSampleCoordinates);
     newVolumeLightSample.targetPdf = targetPdf;
 
     return newVolumeLightSample;

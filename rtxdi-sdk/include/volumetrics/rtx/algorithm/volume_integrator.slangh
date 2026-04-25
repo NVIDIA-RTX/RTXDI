@@ -162,7 +162,7 @@ void integrateVolume(
                                     volumeArgs.restirFroxelDepthSlices, volumeArgs.froxelDepthSliceDistributionExponent, volumeArgs.froxelMaxDistance, camera.nearPlane,
                                     sampleTranslatedWorldPos);
 
-    const f16vec3 randomSample = f16vec3(RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState));
+    const float3 randomSample = float3(RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState));
     uint3 restirFroxelCoordinate = uint3(sampleFroxelUVW * restirGridDimensions + calcUniformCenteredCubePositionSample(randomSample));
 
     RAB_LightSample rabLightSample;
@@ -224,7 +224,7 @@ void integrateVolume(
       {
         // Sample the light
 
-        const float16_t2 risSampleCoordinates = float16_t2(RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState));
+        const float2 risSampleCoordinates = float2(RAB_GetNextRandom(rabRandomState), RAB_GetNextRandom(rabRandomState));
         const uint offsetLightIndex = i + range.firstIndex;
         
         // Note: The Ray Portal index that the NEE light sample should be assumed to be sampled through.
