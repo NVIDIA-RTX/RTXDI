@@ -150,17 +150,7 @@ void RTXDI_SkipRandomLightsRng(inout RAB_RandomSamplerState rng)
     if (range.count == 0)
       continue;
 
-    RAB_GetNextRandom(rng);
-
-    for (uint i = 0; i < range.sampleCount; i++)
-    {
-      RAB_GetNextRandom(rng);
-      RAB_GetNextRandom(rng);
-      RAB_GetNextRandom(rng);
-      RAB_GetNextRandom(rng);
-    }
-
-    RAB_GetNextRandom(rng);
+    RAB_SkipRandoms(rng, 2 + range.sampleCount * 4);
   }
 }
 
@@ -169,8 +159,7 @@ void RTXDI_SkipSingleLightRng(inout RAB_RandomSamplerState rng, uint16_t lightId
   if (lightIdx == RTXDI_INVALID_LIGHT_INDEX)
     return;
 
-  RAB_GetNextRandom(rng);
-  RAB_GetNextRandom(rng);
+  RAB_SkipRandoms(rng, 2);
 }
 
 void RTXDI_SampleRandomLights(
