@@ -135,6 +135,38 @@ struct RTXDI_LightRange
   uint volumeRISSampleCount;
 };
 
+void RTXDI_SkipRandomLightsRng(inout RAB_RandomSamplerState rng)
+{
+  [unroll]
+  for (uint lightType = 0; lightType < RAB_GetLightTypeCount(); ++lightType)
+  {
+    RTXDI_LightRange range = RAB_GetLightRange(lightType);
+    if (range.count == 0)
+      continue;
+
+    RAB_GetNextRandom(rng);
+
+    for (uint i = 0; i < range.sampleCount; i++)
+    {
+      RAB_GetNextRandom(rng);
+      RAB_GetNextRandom(rng);
+      RAB_GetNextRandom(rng);
+      RAB_GetNextRandom(rng);
+    }
+
+    RAB_GetNextRandom(rng);
+  }
+}
+
+void RTXDI_SkipSingleLightRng(inout RAB_RandomSamplerState rng, uint16_t lightIdx)
+{
+  if (lightIdx == RTXDI_INVALID_LIGHT_INDEX)
+    return;
+
+  RAB_GetNextRandom(rng);
+  RAB_GetNextRandom(rng);
+}
+
 void RTXDI_SampleRandomLights(
   inout RTXDI_Reservoir state,
   inout RAB_RandomSamplerState rng,
