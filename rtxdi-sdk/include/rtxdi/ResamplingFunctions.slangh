@@ -12,6 +12,18 @@
 
 #include "Reservoir.slangh"
 
+#ifndef RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
+#define RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS 0
+#endif
+
+#ifndef RTXDI_COHERENT_TEMPORAL_REPROJECTION_OFFSETS
+#define RTXDI_COHERENT_TEMPORAL_REPROJECTION_OFFSETS 0
+#endif
+
+#ifndef RTXDI_DEFER_INITIAL_VISIBILITY
+#define RTXDI_DEFER_INITIAL_VISIBILITY 0
+#endif
+
 bool RTXDI_StreamSample(
   inout RTXDI_Reservoir reservoir,
   uint lightIndex,
@@ -98,6 +110,21 @@ void RTXDI_UpdateReservoirVisibility(inout RTXDI_Reservoir reservoir, RAB_LightS
   // Discard the sample if it's invisible
 
   RTXDI_StoreVisibilityInReservoir(reservoir, attenuation, true);
+}
+
+void RTXDI_UpdateSelectedReservoirVisibility(inout RTXDI_Reservoir reservoir, RAB_Surface surface)
+{
+  if (reservoir.lightIdx == RTXDI_INVALID_LIGHT_INDEX)
+    return;
+
+  RAB_Surface localSurface = surface;
+  if (reservoir.portalIdx != RTXDI_INVALID_PORTAL_INDEX)
+  {
+    RAB_TransformSurface(localSurface, RAB_GetPortalTransform(reservoir.portalIdx));
+  }
+
+  RAB_LightSample selectedSample = RAB_GetLightSample(reservoir.lightIdx, reservoir.uv, localSurface);
+  RTXDI_UpdateReservoirVisibility(reservoir, selectedSample, surface);
 }
 
 struct RTXDI_LightRange
@@ -290,6 +317,16 @@ void RTXDI_ApplyPermutationSampling(inout int2 prevPixelPos, uint uniformRandomN
   prevPixelPos -= offset;
 }
 
+int2 RTXDI_GetTemporalReprojectionOffset(inout RAB_RandomSamplerState rng)
+{
+  const float radius = 5;
+  float2 offsetRnd = float2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng));
+#if RTXDI_COHERENT_TEMPORAL_REPROJECTION_OFFSETS
+  offsetRnd = float2(WaveReadLaneFirst(offsetRnd.x), WaveReadLaneFirst(offsetRnd.y));
+#endif
+  return int2((offsetRnd - 0.5) * radius);
+}
+
 // A structure that groups the application-provided settings for temporal resampling.
 struct RTXDI_TemporalResamplingParameters
 {
@@ -362,9 +399,7 @@ void RTXDI_TemporalResampling(
     int2 offset = int2(0);
     if (i > 0)
     {
-      const float radius = 5;
-      offset.x = int((RAB_GetNextRandom(rng) - 0.5) * radius);
-      offset.y = int((RAB_GetNextRandom(rng) - 0.5) * radius);
+      offset = RTXDI_GetTemporalReprojectionOffset(rng);
     }
     int2 idx = (i < 8) ? tparams.prevPixelCenter + offset : pixelPosition;
 
@@ -540,6 +575,15 @@ struct RTXDI_SpatialResamplingParameters
     int2 screenResolution;
 };
 
+float2 RTXDI_GetSpatialNeighborOffset(inout RAB_RandomSamplerState rng)
+{
+  float2 neighborOffset = float2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng));
+#if RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
+  neighborOffset = float2(WaveReadLaneFirst(neighborOffset.x), WaveReadLaneFirst(neighborOffset.y));
+#endif
+  return neighborOffset * 2 - 1;
+}
+
 // Spatial resampling pass.
 // Operates on the current frame G-buffer and its reservoirs.
 // For each pixel, considers a number of its neighbors and, if their surfaces are 
@@ -554,8 +598,6 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
     inout RAB_RandomSamplerState rng,
     RTXDI_SpatialResamplingParameters sparams)
 {
-  RAB_RandomSamplerState oldRng = rng;
-
   // merge new sample
   RTXDI_Reservoir state = RTXDI_EmptyReservoir();
   RTXDI_CombineReservoirs(state, centerSample, float16_t(0.5f), centerSample.targetPdf);
@@ -565,12 +607,16 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
     // merge neighbors
     int2 selectedID = int2(-1);
 
+#if RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
+    int2 cachedNeighborIDs[16];
+#else
+    RAB_RandomSamplerState oldRng = rng;
+#endif
 
     uint validNeighborMask = 0;
     for (int i = 0; i < sparams.numSamples; i++)
     {
-      float2 neighborOffset = float2(RAB_GetNextRandom(rng), RAB_GetNextRandom(rng));
-      neighborOffset = neighborOffset * 2 - 1;
+      float2 neighborOffset = RTXDI_GetSpatialNeighborOffset(rng);
       int2 neighborID = clamp(int2(neighborOffset * sparams.samplingRadius) + pixelPosition, 0, sparams.screenResolution - 1);
 
       RAB_Surface neighborSurface = RAB_GetGBufferSurface(neighborID, false);
@@ -610,6 +656,9 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
         selectedID = neighborID;
       }
 
+#if RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
+      cachedNeighborIDs[i] = neighborID;
+#endif
       validNeighborMask |= (0x1 << i);
     }
 
@@ -621,14 +670,19 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
       float piSum = state.targetPdf * centerSample.M;
       for (int i = 0; i < sparams.numSamples; i++)
       {
-        float2 neighborOffset = float2(RAB_GetNextRandom(oldRng), RAB_GetNextRandom(oldRng));
+#if !RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
+        float2 neighborOffset = RTXDI_GetSpatialNeighborOffset(oldRng);
+#endif
         if ((validNeighborMask & (0x1 << i)) == 0)
         {
           continue;
         }
+#if RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
+        int2 neighborID = cachedNeighborIDs[i];
+#else
         RAB_GetNextRandom(oldRng);
-        neighborOffset = neighborOffset * 2 - 1;
         int2 neighborID = clamp(int2(neighborOffset * sparams.samplingRadius) + pixelPosition, 0, sparams.screenResolution - 1);
+#endif
 
         // Neighbor surface is in portal space
         RAB_Surface neighborSurface = RAB_GetGBufferSurface(neighborID, false);
