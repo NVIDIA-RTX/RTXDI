@@ -24,6 +24,10 @@
 #define RTXDI_DEFER_INITIAL_VISIBILITY 0
 #endif
 
+#ifndef RTXDI_NO_PORTALS
+#define RTXDI_NO_PORTALS 0
+#endif
+
 bool RTXDI_StreamSample(
   inout RTXDI_Reservoir reservoir,
   uint lightIndex,
@@ -118,10 +122,12 @@ void RTXDI_UpdateSelectedReservoirVisibility(inout RTXDI_Reservoir reservoir, RA
     return;
 
   RAB_Surface localSurface = surface;
+#if !RTXDI_NO_PORTALS
   if (reservoir.portalIdx != RTXDI_INVALID_PORTAL_INDEX)
   {
     RAB_TransformSurface(localSurface, RAB_GetPortalTransform(reservoir.portalIdx));
   }
+#endif
 
   RAB_LightSample selectedSample = RAB_GetLightSample(reservoir.lightIdx, reservoir.uv, localSurface);
   RTXDI_UpdateReservoirVisibility(reservoir, selectedSample, surface);
@@ -207,11 +213,14 @@ void RTXDI_SampleRandomLights(
       const float risRnd = RAB_GetNextRandom(rng);
 
       // Randomly turn a light into virtual light to get cross portal samples
-      
-      const float portalProbability = totalPortalPdf;
-      float randPortal = RAB_GetNextRandom(rng);
+
       uint portalIdx = RTXDI_INVALID_PORTAL_INDEX;
       float invSourcePdf = rangeInvSourcePdf;
+#if RTXDI_NO_PORTALS
+      RAB_GetNextRandom(rng);
+#else
+      const float portalProbability = totalPortalPdf;
+      float randPortal = RAB_GetNextRandom(rng);
       if (randPortal >= portalProbability)
       {
         invSourcePdf /= (1.0 - portalProbability);
@@ -233,6 +242,7 @@ void RTXDI_SampleRandomLights(
           }
         }
       }
+#endif
 
       if (rndLight != excludeLightIdx || portalIdx != excludePortalIdx)
       {
@@ -240,10 +250,12 @@ void RTXDI_SampleRandomLights(
 
         // If a light is virtual, transform the surface to virtual light space
 
+#if !RTXDI_NO_PORTALS
         if (portalIdx != RTXDI_INVALID_PORTAL_INDEX)
         {
           RAB_TransformSurface(localSurface, RAB_GetPortalTransform(uint8_t(portalIdx)));
         }
+#endif
 
         // Sample the light
 
@@ -304,10 +316,12 @@ RTXDI_Reservoir RTXDI_SampleSingleLight(
 
   // If a light is virtual, transform the surface to virtual light space
 
+#if !RTXDI_NO_PORTALS
   if (portalIdx != RTXDI_INVALID_PORTAL_INDEX)
   {
     RAB_TransformSurface(localSurface, RAB_GetPortalTransform(portalIdx));
   }
+#endif
 
   // Sample the light
 
@@ -444,8 +458,10 @@ void RTXDI_TemporalResampling(
     RAB_Surface prevSurface = RAB_GetGBufferSurface(idx, true);
     if (!RAB_IsSurfaceValid(prevSurface))
       continue;
+#if !RTXDI_NO_PORTALS
     if (!tparams.enableCrossPortalReuse && RAB_GetSurfacePortalSpace(prevSurface) != RAB_GetSurfacePortalSpace(surface))
       continue;
+#endif
     if (i < 8 && !RTXDI_IsValidNeighbor(RAB_GetSurfaceNormal(surface), RAB_GetSurfaceNormal(prevSurface),
         tparams.expectedPrevHitDistance, RAB_GetSurfaceLinearDepth(prevSurface), tparams.normalThreshold, tparams.depthThreshold))
       continue;
@@ -506,10 +522,12 @@ void RTXDI_TemporalResampling(
     {
       // For cross portal light, transform the surface to light space
       RAB_Surface virtualSurface = surface;
+#if !RTXDI_NO_PORTALS
       if (prevReservoir.portalIdx != RTXDI_INVALID_PORTAL_INDEX)
       {
         RAB_TransformSurface(virtualSurface, RAB_GetPortalTransform(prevReservoir.portalIdx));
       }
+#endif
 
       // Get light sample from light space
       RAB_LightSample candidateSample = RAB_GetLightSample(prevReservoir.lightIdx, prevReservoir.uv, virtualSurface);
@@ -536,12 +554,14 @@ void RTXDI_TemporalResampling(
     {
       float temporalP = 0;
       RAB_Surface temporalSurface = RAB_GetSurfaceForTemporalBiasCorrection(surface, prevPixelID, prevNormal, tparams.virtualMotionVector);
-      
+
       RAB_Surface virtualTemporalSurface = temporalSurface;
+#if !RTXDI_NO_PORTALS
       if (state.portalIdx != RTXDI_INVALID_PORTAL_INDEX)
       {
         RAB_TransformSurface(virtualTemporalSurface, RAB_GetPortalTransform(state.portalIdx));
       }
+#endif
 
       RAB_LightSample selectedSampleAtTemporalSurface = RAB_GetLightSample(selectedLightPrevIdx,
         state.uv, virtualTemporalSurface, /* usePreviousLights = */ true);
@@ -557,8 +577,13 @@ void RTXDI_TemporalResampling(
       if (temporalP > 0 && tparams.biasCorrectionMode >= RTXDI_BIAS_CORRECTION_RAY_TRACED && !selectedSampleKnownVisible)
       {
         float3 attenuation;
+#if RTXDI_NO_PORTALS
+        bool sampleVisible = RAB_TraceLightSampleVisibility(temporalSurface, selectedSampleAtTemporalSurface,
+          RTXDI_INVALID_PORTAL_INDEX, false, false, true, attenuation);
+#else
         bool sampleVisible = RAB_TraceLightSampleVisibility(temporalSurface, selectedSampleAtTemporalSurface,
           state.portalIdx, false, false, true, attenuation);
+#endif
 
         if (!sampleVisible)
           temporalP = 0;
@@ -652,7 +677,11 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
       int2 neighborID = clamp(int2(neighborOffset * sparams.samplingRadius) + pixelPosition, 0, sparams.screenResolution - 1);
 
       RAB_Surface neighborSurface = RAB_GetGBufferSurface(neighborID, false);
+#if RTXDI_NO_PORTALS
+      if (!RAB_IsSurfaceValid(neighborSurface))
+#else
       if (!RAB_IsSurfaceValid(neighborSurface) || RAB_GetSurfacePortalSpace(centerSurface) != RAB_GetSurfacePortalSpace(neighborSurface))
+#endif
       {
         continue;
       }
@@ -671,10 +700,12 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
       {
         // For cross portal light, transform surface to light space
         RAB_Surface portalSurface = centerSurface;
+#if !RTXDI_NO_PORTALS
         if (neighborReservoir.portalIdx != RTXDI_INVALID_PORTAL_INDEX)
         {
           RAB_TransformSurface(portalSurface, RAB_GetPortalTransform(neighborReservoir.portalIdx));
         }
+#endif
 
         RAB_LightSample candidateSample = RAB_GetLightSample(neighborReservoir.lightIdx, neighborReservoir.uv, portalSurface);
 
@@ -727,8 +758,13 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
         if (sparams.biasCorrectionMode >= RTXDI_BIAS_CORRECTION_RAY_TRACED)
         {
           float3 attenuation;
+#if RTXDI_NO_PORTALS
+          sampleVisible = RAB_TraceLightSampleVisibility(neighborSurface, lightSample,
+            RTXDI_INVALID_PORTAL_INDEX, true, false, false, attenuation);
+#else
           sampleVisible = RAB_TraceLightSampleVisibility(neighborSurface, lightSample,
             state.portalIdx, true, false, false, attenuation);
+#endif
         }
 
         float ps = 0;
