@@ -32,7 +32,7 @@ float2 RTXDI_GetDlssEnhancementDirectFactor(
   const float3 centerDiffuseAlbedo = centerSurface.opaqueSurfaceMaterialInteraction.albedo;
   const float3 centerSpecularF0 = centerSurface.opaqueSurfaceMaterialInteraction.baseReflectivity;
   const float centerDepth = length(centerSurface.minimalSurfaceInteraction.position - cameraPosition);
-  const float3 centerNormal = centerSurface.minimalSurfaceInteraction.triangleNormal; ;
+  const float3 centerNormal = centerSurface.minimalSurfaceInteraction.geometryNormal;
 
   float2 neighborBRDFSum = float2(0);
   int16_t neighborWeight = 0;
@@ -53,7 +53,7 @@ float2 RTXDI_GetDlssEnhancementDirectFactor(
     float neighborDepth = length(neighborSurface.minimalSurfaceInteraction.position - cameraPosition);
     // Ignore neighbors with very different normal and depth
     if (abs(neighborDepth - centerDepth) > centerDepth * neighborDepthThreshold ||
-        dot(centerNormal, neighborSurface.minimalSurfaceInteraction.triangleNormal) < neighborNormalThreshold)
+        dot(centerNormal, neighborSurface.minimalSurfaceInteraction.geometryNormal) < neighborNormalThreshold)
     {
       continue;
     }
@@ -121,7 +121,7 @@ float2 ReSTIRGI_GetDlssEnhancementIndirectFactorLaplacian(
   float3 centerDiffuseAlbedo = centerSurface.opaqueSurfaceMaterialInteraction.albedo;
   float3 centerSpecularF0 = centerSurface.opaqueSurfaceMaterialInteraction.baseReflectivity;
   float3 centerShadingNormal = centerSurface.opaqueSurfaceMaterialInteraction.shadingNormal;
-  float3 centerTriangleNormal = centerSurface.minimalSurfaceInteraction.triangleNormal;
+  float3 centerGeometryNormal = centerSurface.minimalSurfaceInteraction.geometryNormal;
   const float centerDepth = length(centerSurface.minimalSurfaceInteraction.position - cameraPosition);
 
   SurfaceMaterialInteractionSplitWeight centerBrdf = RAB_CalculateBRDF(L, centerSurface);
@@ -156,7 +156,7 @@ float2 ReSTIRGI_GetDlssEnhancementIndirectFactorLaplacian(
     // Ignore neighbors with very different normal
     if (abs(depth - centerDepth) > centerDepth * 0.05 ||
         dot(centerShadingNormal, surface.opaqueSurfaceMaterialInteraction.shadingNormal) < 0.1 ||
-        dot(centerTriangleNormal, surface.minimalSurfaceInteraction.triangleNormal) < 0.9)
+        dot(centerGeometryNormal, surface.minimalSurfaceInteraction.geometryNormal) < 0.9)
     {
       continue;
     }
