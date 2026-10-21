@@ -1332,6 +1332,7 @@ void RTXDI_FindGradientSampleAndBestLight(
   int2 gradientPos,
   int2 resolution,
   bool usePreviousIlluminance,
+  int reservoirBufferIndex,
   out bool usePrevSample,
   out float selectedIlluminance,
   out int2 selectedPixelPos,
@@ -1366,18 +1367,24 @@ void RTXDI_FindGradientSampleAndBestLight(
     if (any(srcPixelPos >= int2(resolution)))
       continue;
     
-    // Load the current frame sampled lighting luminance.
     const float currIlluminance = RAB_GetSurfaceIlluminance(srcPixelPos, false);
+
+    // Load the current frame sampled lighting luminance.
+    const RTXDI_Reservoir lightReservoir =
+      RAB_LoadReservoir(srcPixelPos, reservoirBufferIndex);
+    const float lightIlluminance = lightReservoir.weightSum > 0.0f
+      ? currIlluminance / lightReservoir.weightSum
+      : 0.0f;
 
     // Ignore pixels that the bridge says are invalid for gradient computation
     if (currIlluminance < 0)
       continue;
   
     // Update the best light accumulator
-    if (currIlluminance > bestLightIlluminance)
+    if (lightIlluminance > bestLightIlluminance)
     {
       bestLightPixelPos = srcPixelPos;
-      bestLightIlluminance = currIlluminance;
+      bestLightIlluminance = lightIlluminance;
     }
 
     // Find the matching pixel in the previous frame - that information is produced
