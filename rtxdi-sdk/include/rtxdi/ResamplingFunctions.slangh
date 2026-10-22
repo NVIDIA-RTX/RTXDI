@@ -266,6 +266,11 @@ void RTXDI_SampleRandomLights(
           localSelectedSample = candidateSample;
         }
       }
+      else
+      {
+        // rejected light also contributes a null sample
+        localState.M += uint16_t(1);
+      }
 
       // Accumulate and wrap the light index
 
