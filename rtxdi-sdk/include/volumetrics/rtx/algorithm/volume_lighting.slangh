@@ -351,18 +351,16 @@ vec3 evalVolumetricNEE(
     }
   }
 
+  // WAR for NVBUGS 7020086: this fetch in divergent control flow causes a GPU page fault in the G-buffer ray query kernel.
+  // All lanes fetch; lanes outside every volume use a valid coordinate and return 0.
   if (!volumeFound)
-    return 0.0;
+  {
+    physicalFroxelUVW = vec3(0.5f);
+  }
 
   SphericalHarmonic sh = HarmonicsHelpers::loadFiltered3D<SphericalHarmonic>(volumeFilteredRadianceY, volumeFilteredRadianceCoCg, physicalFroxelUVW);
   sh.hanningFilter(0.7f); // This was determined experimentally by looking at scenes with lots of geometry and sharp light shafts and tuning until ringing was minimized
-  if(phaseFunction)
-  {
-    return sh.evaluateHenyeyGreenstein(direction, anisotropy);
-  }
-  else
-  {
-    return sh.getIrradiance();
-  }
+  const vec3 result = phaseFunction ? sh.evaluateHenyeyGreenstein(direction, anisotropy) : sh.getIrradiance();
+  return volumeFound ? result : vec3(0.0f);
 }
 #endif
