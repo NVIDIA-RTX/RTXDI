@@ -89,14 +89,12 @@ bool evalNEE(
 void integrateVolume(
   inout RAB_RandomSamplerState rabRandomState, uvec3 froxelIndex, uint froxelVolume, uint previousFroxelVolume, bool previousVolumeExists,
   Ray ray, MinimalRayInteraction minimalRayInteraction, VolumeInteraction volumeInteraction,
-  vec3 previousFroxelUVW, uvec3 previousFroxelIndex, uvec3 clampedPreviousFroxelIndex)
+  vec3 previousFroxelUVW, uvec3 previousFroxelIndex, uvec3 clampedPreviousFroxelIndex,
+  SphericalHarmonic indirectRadianceSH)
 {
   const VolumeArgs volumeArgs = cb.volumeArgs;
   const uvec3 froxelVolumeOffset = uvec3(volumeArgs.froxelGridDimensions.x * froxelVolume, 0, 0);
   const uvec3 previousFroxelVolumeOffset = uvec3(volumeArgs.froxelGridDimensions.x * previousFroxelVolume, 0, 0);
-
-  // Apply some temporal fuzzing to break up lumpy signal caused by restir
-  previousFroxelUVW = calculateJitteredFroxelUvw(volumeArgs, previousFroxelUVW, 0.05f);
 
   // Read information from the previous frame for accumulation based on a reprojected froxel coordinate
 
@@ -109,21 +107,13 @@ void integrateVolume(
 
   if (previousVolumeExists && reprojectionValid && volumeArgs.maxAccumulationFrames > 0)
   {
-    // Read previous history and radiance
-
-    // Note: This conversion is done after checking if the reprojection is valid to allow for the virtual UVW coordinates to trigger a failure on that if
-    // applicable (for proper reprojection confidence loss). Additionally, in theory this conversion could cause the froxel sampled from UVW wise to detach
-    // from the already computed previous froxel index, but as long as the logic is working properly (e.g. clamping only to the center of the edge froxel),
-    // this will not happen.
-    vec3 physicalPreviousFroxelUVW = virtualFroxelUVWToPhysicalFroxelUVW(
-      previousFroxelUVW, previousFroxelVolume,
-      volumeArgs.minFilteredRadianceU, volumeArgs.maxFilteredRadianceU, volumeArgs.inverseNumFroxelVolumes);
-      
-    // Note: Filtered read for now (may pose issues in the future depending on how we handle the contribution through ray portals as
-    // these methods may require custom filtering logic). Additionally, the history age stored in the alpha channel is filtered too
-    // which is fine as this should blend the histories of the contributions involved in the sample, which makes sense.
-    oldRadianceSH = HarmonicsHelpers::loadFiltered3D<SphericalHarmonic>(PrevAccumulatedRadianceY, PrevAccumulatedRadianceCoCg, physicalPreviousFroxelUVW);
-    const float oldHistoryAge = PrevAccumulatedRadianceAge.SampleLevel(physicalPreviousFroxelUVW, 0) * volumeArgs.maxAccumulationFrames;
+    // Reuses one history cell so accumulation preserves shadow boundaries.
+    const float3 historyUVW = virtualFroxelUVWToPhysicalFroxelUVW(
+      froxelCoordinateToFroxelUVW(froxelIndexToFroxelCoordinate(clampedPreviousFroxelIndex),
+        uvec3(volumeArgs.froxelGridDimensions, volumeArgs.froxelDepthSlices)),
+      previousFroxelVolume, volumeArgs.minFilteredRadianceU, volumeArgs.maxFilteredRadianceU, volumeArgs.inverseNumFroxelVolumes);
+    oldRadianceSH = HarmonicsHelpers::loadFiltered3D<SphericalHarmonic>(PrevAccumulatedRadianceY, PrevAccumulatedRadianceCoCg, historyUVW);
+    const float oldHistoryAge = PrevAccumulatedRadianceAge.SampleLevel(historyUVW, 0) * volumeArgs.maxAccumulationFrames;
 
     // Note: Increment the sampled history age by 1 to represent this new sample.
     newHistoryAge = min(oldHistoryAge + 1.0f, volumeArgs.maxAccumulationFrames);
@@ -145,7 +135,7 @@ void integrateVolume(
 
   // Perform NEE on the final Reservoir
 
-  SphericalHarmonic radianceSH = SphericalHarmonic();
+  SphericalHarmonic radianceSH = indirectRadianceSH;
   
   // Select and sample from a light for NEE via the Reservoir
   RAB_VolumeInteraction rabVolumeInteraction;
