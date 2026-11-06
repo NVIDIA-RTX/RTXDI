@@ -28,6 +28,10 @@
 #define RTXDI_NO_PORTALS 0
 #endif
 
+#ifndef RTXDI_MAX_ACTIVE_NEIGHBORS
+#define RTXDI_MAX_ACTIVE_NEIGHBORS 4
+#endif
+
 bool RTXDI_StreamSample(
   inout RTXDI_Reservoir reservoir,
   uint lightIndex,
@@ -370,6 +374,27 @@ int2 RTXDI_GetTemporalReprojectionOffset(inout RAB_RandomSamplerState rng)
   return int2((offsetRnd - 0.5) * radius);
 }
 
+#if RTXDI_TEMPORAL_SELECTION_PASS || RTXDI_SPATIAL_SELECTION_PASS
+float RTXDI_GetNeighborCompatibilityScore(
+    float3 centerNormal,
+    float inversePositionSigma,
+    RAB_NeighborBasis neighborBasis,
+    int2 pixelOffset,
+    RAB_Surface neighborSurface)
+{
+  const float normalDot = max(0.0, dot(centerNormal, RAB_GetSurfaceNormal(neighborSurface)));
+  const float normalDot2 = normalDot * normalDot;
+  const float normalDot4 = normalDot2 * normalDot2;
+  const float normalSimilarity = normalDot4 * normalDot4;
+  const float neighborDepth = max(RAB_GetSurfaceLinearDepth(neighborSurface), 0.0);
+  const float3 neighborRay = neighborBasis.ray + float3(neighborBasis.pixelStep * float2(pixelOffset), 0.0);
+  const float scale = neighborDepth * inversePositionSigma * rsqrt(max(dot(neighborRay, neighborRay), 1e-12));
+  const float3 separation = neighborRay * scale - neighborBasis.centerPositionScaled;
+  const float distanceSquared = dot(separation, separation);
+  return normalSimilarity * exp(-sqrt(max(distanceSquared, 0.0)));
+}
+#endif
+
 // A structure that groups the application-provided settings for temporal resampling.
 struct RTXDI_TemporalResamplingParameters
 {
@@ -422,6 +447,108 @@ struct RTXDI_TemporalResamplingParameters
     uint uniformRandomNumber;
 };
 
+#if RTXDI_TEMPORAL_SELECTION_PASS
+bool RTXDI_IsActiveTemporalNeighbor(
+    int2 pixel,
+    RAB_Surface surface,
+    RTXDI_TemporalResamplingParameters tparams,
+    out RAB_Surface previousSurface,
+    uint globalIndex = ~0u)
+{
+  previousSurface = RAB_EmptySurface();
+  if (!RAB_IsPreviousReservoirPixelActive(pixel, tparams.sourceBufferIndex, globalIndex))
+  {
+    return false;
+  }
+
+  previousSurface = RAB_GetNeighborSelectionSurface(pixel, true);
+  if (!RAB_IsSurfaceValid(previousSurface))
+  {
+    return false;
+  }
+#if !RTXDI_NO_PORTALS
+  if (!tparams.enableCrossPortalReuse && RAB_GetSurfacePortalSpace(previousSurface) != RAB_GetSurfacePortalSpace(surface))
+  {
+    return false;
+  }
+#endif
+
+  if (!RTXDI_IsValidNeighbor(RAB_GetSurfaceNormal(surface), RAB_GetSurfaceNormal(previousSurface),
+      tparams.expectedPrevHitDistance, RAB_GetSurfaceLinearDepth(previousSurface), tparams.normalThreshold, tparams.depthThreshold))
+  {
+    return false;
+  }
+  return true;
+}
+
+int2 RTXDI_SelectActiveTemporalNeighbor(
+    uint2 pixelPosition,
+    RAB_Surface surface,
+    inout RAB_RandomSamplerState rng,
+    RTXDI_TemporalResamplingParameters tparams,
+    out float16_t3 previousNormal)
+{
+  previousNormal = float16_t3(0.0);
+  if (tparams.maxHistoryLength == 0)
+  {
+    return int2(-1);
+  }
+
+  int2 centerPixel = tparams.prevPixelCenter;
+  if (tparams.enablePermutationSampling)
+  {
+    RTXDI_ApplyPermutationSampling(centerPixel, tparams.uniformRandomNumber);
+  }
+
+  RAB_Surface previousSurface;
+  if (RTXDI_IsActiveTemporalNeighbor(centerPixel, surface, tparams, previousSurface))
+  {
+    previousNormal = RAB_GetSurfaceNormal(previousSurface);
+    return centerPixel;
+  }
+
+  const float3 centerNormal = RAB_GetSurfaceNormal(surface);
+  const float centerDepth = max(tparams.expectedPrevHitDistance, 0.0);
+  const float inversePositionSigma = rcp(max(centerDepth * sqrt(0.05 / pi), 1e-6));
+  const RAB_NeighborBasis neighborBasis = RAB_InitNeighborBasis(tparams.prevPixelCenter, true, centerDepth * inversePositionSigma);
+  const uint candidateCount = max(cb.sparseRenderingArgs.rtxdiTemporalNeighborCandidateCount, 1u);
+  const float searchRadius = max(cb.sparseRenderingArgs.rtxdiTemporalNeighborSearchRadius, 0.0);
+  float weightSum = 0.0;
+  int2 selectedPixel = int2(-1);
+
+  for (uint i = 0; i < candidateCount; i++)
+  {
+    uint candidateGlobalIndex;
+    const int2 candidatePixel = RAB_GetActiveNeighborCandidate(centerPixel, true, searchRadius, rng, candidateGlobalIndex);
+    if (!RTXDI_IsActiveTemporalNeighbor(candidatePixel, surface, tparams, previousSurface, candidateGlobalIndex))
+    {
+      continue;
+    }
+
+    const float score = RTXDI_GetNeighborCompatibilityScore(centerNormal, inversePositionSigma,
+      neighborBasis, candidatePixel - tparams.prevPixelCenter, previousSurface);
+    if (!isfinite(score) || score <= 0.0)
+    {
+      continue;
+    }
+
+    weightSum += score;
+    if (RAB_GetNextRandom(rng) * weightSum < score)
+    {
+      selectedPixel = candidatePixel;
+      previousNormal = RAB_GetSurfaceNormal(previousSurface);
+    }
+
+    if (score >= 0.5)
+    {
+      break;
+    }
+  }
+
+  return selectedPixel;
+}
+#endif
+
 void RTXDI_TemporalResampling(
     inout RTXDI_Reservoir state,
     uint2 pixelPosition,
@@ -434,7 +561,14 @@ void RTXDI_TemporalResampling(
   isGBufferSimilar = false;
   int2 prevPixelID = -1;
   float16_t3 prevNormal;
-  for (int i = 0; i < 9; i++)
+  // Compact reservoirs take the neighbor that temporal selection cached, so they skip the search.
+  const bool activeOnlyReuse = RAB_IsActiveOnlyReuseEnabled();
+  if (activeOnlyReuse)
+  {
+    prevPixelID = RAB_LoadTemporalNeighbor(prevNormal);
+    isGBufferSimilar = prevPixelID.x >= 0;
+  }
+  for (int i = 0; i < (activeOnlyReuse ? 0 : 9); i++)
   {
     // First, look at the previous surface at the position pointed to by the motion vector.
     // If that surface doesn't match, try the surface at the same pixel, without the similarity test.
@@ -497,7 +631,7 @@ void RTXDI_TemporalResampling(
   float storedTemporalTargetPdf = 0.0f;
   if (prevPixelID.x >= 0)
   {
-    RTXDI_Reservoir prevReservoir = RAB_LoadReservoir(prevPixelID, tparams.sourceBufferIndex);
+    RTXDI_Reservoir prevReservoir = RAB_LoadReservoir(prevPixelID, tparams.sourceBufferIndex, true);
     prevReservoir.M = min(prevReservoir.M, uint16_t(historyLimit));
     previousM = prevReservoir.M;
 
@@ -629,7 +763,6 @@ void RTXDI_TemporalResampling(
   }
 }
 
-
 // A structure that groups the application-provided settings for spatial resampling.
 struct RTXDI_SpatialResamplingParameters
 {
@@ -668,6 +801,110 @@ float2 RTXDI_GetSpatialNeighborOffset(inout RAB_RandomSamplerState rng)
   return neighborOffset * 2 - 1;
 }
 
+uint RTXDI_GetSelectedActiveNeighbor(uint selectedPixels[RTXDI_MAX_ACTIVE_NEIGHBORS], uint index)
+{
+  switch (index)
+  {
+    case 0: return selectedPixels[0];
+    case 1: return selectedPixels[1];
+    case 2: return selectedPixels[2];
+    case 3: return selectedPixels[3];
+    default: return ~0u;
+  }
+}
+
+#if RTXDI_SPATIAL_SELECTION_PASS
+void RTXDI_UpdateSelectedActiveNeighbor(
+    uint slot,
+    uint neighborCount,
+    uint candidate,
+    float score,
+    float weightSum,
+    RAB_RandomSamplerState rng,
+    inout uint selectedPixel)
+{
+  if (slot < neighborCount)
+  {
+    RAB_SkipRandoms(rng, slot);
+    if (RAB_GetNextRandom(rng) * weightSum < score)
+    {
+      selectedPixel = candidate;
+    }
+  }
+}
+
+void RTXDI_SelectActiveSpatialNeighbors(
+    uint2 pixelPosition,
+    RAB_Surface centerSurface,
+    inout RAB_RandomSamplerState rng,
+    RTXDI_SpatialResamplingParameters sparams,
+    out uint selectedPixels[RTXDI_MAX_ACTIVE_NEIGHBORS])
+{
+  const uint neighborCount = min(sparams.numSamples, uint(RTXDI_MAX_ACTIVE_NEIGHBORS));
+  selectedPixels[0] = ~0u;
+  selectedPixels[1] = ~0u;
+  selectedPixels[2] = ~0u;
+  selectedPixels[3] = ~0u;
+
+  const uint candidateCount = max(cb.sparseRenderingArgs.rtxdiSpatialNeighborCandidateCount, neighborCount);
+  const float searchRadius = max(cb.sparseRenderingArgs.rtxdiSpatialNeighborSearchRadius, 0.0);
+  const float3 centerNormal = RAB_GetSurfaceNormal(centerSurface);
+  const float centerDepth = max(RAB_GetSurfaceLinearDepth(centerSurface), 0.0);
+  const float inversePositionSigma = rcp(max(centerDepth * sqrt(0.05 / pi), 1e-6));
+  const RAB_NeighborBasis neighborBasis = RAB_InitNeighborBasis(int2(pixelPosition), false, centerDepth * inversePositionSigma);
+  float weightSum = 0.0;
+  uint goodCandidateCount = 0;
+
+  for (uint candidateIndex = 0; candidateIndex < candidateCount; candidateIndex++)
+  {
+    uint candidateGlobalIndex;
+    const int2 candidatePixel = RAB_GetActiveNeighborCandidate(int2(pixelPosition), false, searchRadius, rng, candidateGlobalIndex);
+    if (all(candidatePixel == int2(pixelPosition)))
+    {
+      continue;
+    }
+
+    const RAB_Surface candidateSurface = RAB_GetSpatialCandidateSurface(candidatePixel, candidateGlobalIndex);
+    if (!RAB_IsSurfaceValid(candidateSurface))
+    {
+      continue;
+    }
+#if !RTXDI_NO_PORTALS
+    if (RAB_GetSurfacePortalSpace(candidateSurface) != RAB_GetSurfacePortalSpace(centerSurface))
+    {
+      continue;
+    }
+#endif
+    if (!RTXDI_IsValidNeighbor(centerNormal, RAB_GetSurfaceNormal(candidateSurface), centerDepth,
+        RAB_GetSurfaceLinearDepth(candidateSurface), sparams.normalThreshold, sparams.depthThreshold))
+    {
+      continue;
+    }
+
+    const float score = RTXDI_GetNeighborCompatibilityScore(centerNormal, inversePositionSigma,
+      neighborBasis, candidatePixel - int2(pixelPosition), candidateSurface);
+    if (!isfinite(score) || score <= 0.0)
+    {
+      continue;
+    }
+
+    weightSum += score;
+    // Literal slots avoid dynamic cache indexing and expose independent random draws.
+    RTXDI_UpdateSelectedActiveNeighbor(0, neighborCount, candidateGlobalIndex, score, weightSum, rng, selectedPixels[0]);
+    RTXDI_UpdateSelectedActiveNeighbor(1, neighborCount, candidateGlobalIndex, score, weightSum, rng, selectedPixels[1]);
+    RTXDI_UpdateSelectedActiveNeighbor(2, neighborCount, candidateGlobalIndex, score, weightSum, rng, selectedPixels[2]);
+    RTXDI_UpdateSelectedActiveNeighbor(3, neighborCount, candidateGlobalIndex, score, weightSum, rng, selectedPixels[3]);
+    RAB_SkipRandoms(rng, neighborCount);
+
+    goodCandidateCount += score >= 0.5 ? 1u : 0u;
+    if (goodCandidateCount >= neighborCount)
+    {
+      break;
+    }
+  }
+}
+#endif
+
 // Spatial resampling pass.
 // Operates on the current frame G-buffer and its reservoirs.
 // For each pixel, considers a number of its neighbors and, if their surfaces are 
@@ -682,6 +919,13 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
     inout RAB_RandomSamplerState rng,
     RTXDI_SpatialResamplingParameters sparams)
 {
+  // Compact reservoirs merge the neighbors that spatial selection cached and validated.
+  const bool activeOnlyReuse = RAB_IsActiveOnlyReuseEnabled();
+  if (activeOnlyReuse)
+  {
+    sparams.numSamples = min(sparams.numSamples, uint(RTXDI_MAX_ACTIVE_NEIGHBORS));
+  }
+
   // merge new sample
   RTXDI_Reservoir state = RTXDI_EmptyReservoir();
   RTXDI_CombineReservoirs(state, centerSample, float16_t(0.5f), centerSample.targetPdf);
@@ -696,31 +940,52 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
 #else
     RAB_RandomSamplerState oldRng = rng;
 #endif
+    uint activeNeighbors[RTXDI_MAX_ACTIVE_NEIGHBORS];
+    if (activeOnlyReuse)
+    {
+      RAB_LoadSpatialNeighbors(activeNeighbors);
+    }
 
     uint validNeighborMask = 0;
     for (int i = 0; i < sparams.numSamples; i++)
     {
-      float2 neighborOffset = RTXDI_GetSpatialNeighborOffset(rng);
-      int2 neighborID = clamp(int2(neighborOffset * sparams.samplingRadius) + pixelPosition, 0, sparams.screenResolution - 1);
+      int2 neighborID;
+      uint neighborGlobalIndex = ~0u;
+      RAB_Surface neighborSurface;
+      if (activeOnlyReuse)
+      {
+        neighborGlobalIndex = RTXDI_GetSelectedActiveNeighbor(activeNeighbors, uint(i));
+        neighborID = RAB_GetActiveNeighborPixel(neighborGlobalIndex);
+        if (neighborID.x < 0)
+        {
+          continue;
+        }
+        neighborSurface = RAB_GetActiveNeighborSurface(neighborID, neighborGlobalIndex);
+      }
+      else
+      {
+        float2 neighborOffset = RTXDI_GetSpatialNeighborOffset(rng);
+        neighborID = clamp(int2(neighborOffset * sparams.samplingRadius) + pixelPosition, 0, sparams.screenResolution - 1);
 
-      RAB_Surface neighborSurface = RAB_GetGBufferSurface(neighborID, false);
+        neighborSurface = RAB_GetGBufferSurface(neighborID, false);
 #if RTXDI_NO_PORTALS
-      if (!RAB_IsSurfaceValid(neighborSurface))
+        if (!RAB_IsSurfaceValid(neighborSurface))
 #else
-      if (!RAB_IsSurfaceValid(neighborSurface) || RAB_GetSurfacePortalSpace(centerSurface) != RAB_GetSurfacePortalSpace(neighborSurface))
+        if (!RAB_IsSurfaceValid(neighborSurface) || RAB_GetSurfacePortalSpace(centerSurface) != RAB_GetSurfacePortalSpace(neighborSurface))
 #endif
-      {
-        continue;
+        {
+          continue;
+        }
+
+        if (!RTXDI_IsValidNeighbor(RAB_GetSurfaceNormal(centerSurface), RAB_GetSurfaceNormal(neighborSurface),
+            RAB_GetSurfaceLinearDepth(centerSurface), RAB_GetSurfaceLinearDepth(neighborSurface),
+            sparams.normalThreshold, sparams.depthThreshold))
+        {
+          continue;
+        }
       }
 
-      if (!RTXDI_IsValidNeighbor(RAB_GetSurfaceNormal(centerSurface), RAB_GetSurfaceNormal(neighborSurface),
-          RAB_GetSurfaceLinearDepth(centerSurface), RAB_GetSurfaceLinearDepth(neighborSurface),
-          sparams.normalThreshold, sparams.depthThreshold))
-      {
-        continue;
-      }
-
-      RTXDI_Reservoir neighborReservoir = RAB_LoadReservoir(neighborID, sparams.sourceBufferIndex);
+      RTXDI_Reservoir neighborReservoir = RAB_LoadReservoir(neighborID, sparams.sourceBufferIndex, neighborGlobalIndex);
 
       if (RAB_UseLightIdentityResolution())
       {
@@ -763,46 +1028,78 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
     {
       float pi = state.targetPdf;
       float piSum = state.targetPdf * centerSample.M;
+      uint previousNeighborIndex = ~0u;
+      float previousNeighborPdf = 0;
+      uint16_t previousNeighborM = 0;
       for (int i = 0; i < sparams.numSamples; i++)
       {
-#if !RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
-        float2 neighborOffset = RTXDI_GetSpatialNeighborOffset(oldRng);
-#endif
-        if ((validNeighborMask & (0x1 << i)) == 0)
+        int2 neighborID;
+        uint neighborGlobalIndex = ~0u;
+        RAB_Surface neighborSurface;
+        if (activeOnlyReuse)
         {
-          continue;
+          if ((validNeighborMask & (0x1 << i)) == 0)
+          {
+            continue;
+          }
+          neighborGlobalIndex = RTXDI_GetSelectedActiveNeighbor(activeNeighbors, uint(i));
+          neighborID = RAB_GetActiveNeighborPixel(neighborGlobalIndex);
+
+          // Spatial selection can put the same neighbor in consecutive slots, and each slot was merged.
+          // A repeat still adds to the denominator, but reuses the previous slot's PDF, visibility and M.
+          if (neighborGlobalIndex == previousNeighborIndex)
+          {
+            if (all(selectedID == neighborID))
+            {
+              pi = previousNeighborPdf;
+            }
+            piSum += previousNeighborPdf * previousNeighborM;
+            continue;
+          }
+
+          // Neighbor surface is in portal space
+          neighborSurface = RAB_GetActiveNeighborSurface(neighborID, neighborGlobalIndex);
         }
+        else
+        {
+#if !RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
+          float2 neighborOffset = RTXDI_GetSpatialNeighborOffset(oldRng);
+#endif
+          if ((validNeighborMask & (0x1 << i)) == 0)
+          {
+            continue;
+          }
 #if RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
-        int2 neighborID = cachedNeighborIDs[i];
+          neighborID = cachedNeighborIDs[i];
 #else
-        RAB_GetNextRandom(oldRng);
-        int2 neighborID = clamp(int2(neighborOffset * sparams.samplingRadius) + pixelPosition, 0, sparams.screenResolution - 1);
+          RAB_GetNextRandom(oldRng);
+          neighborID = clamp(int2(neighborOffset * sparams.samplingRadius) + pixelPosition, 0, sparams.screenResolution - 1);
 #endif
 
-        // Neighbor surface is in portal space
-        RAB_Surface neighborSurface = RAB_GetGBufferSurface(neighborID, false);
+          // Neighbor surface is in portal space
+          neighborSurface = RAB_GetGBufferSurface(neighborID, false);
+        }
 
         // Get a light sample in portal space
         RAB_LightSample lightSample =
           RAB_GetPortalSpaceLightSample(state.lightIdx, state.uv, state.portalIdx, neighborSurface);
 
-        bool sampleVisible = true;
-        if (sparams.biasCorrectionMode >= RTXDI_BIAS_CORRECTION_RAY_TRACED)
+        // A zero target PDF needs no visibility ray.
+        float ps = RAB_GetLightSampleTargetPdfForSurface(lightSample, neighborSurface);
+        if (ps > 0 && sparams.biasCorrectionMode >= RTXDI_BIAS_CORRECTION_RAY_TRACED)
         {
           float3 attenuation;
 #if RTXDI_NO_PORTALS
-          sampleVisible = RAB_TraceLightSampleVisibility(neighborSurface, lightSample,
+          const bool sampleVisible = RAB_TraceLightSampleVisibility(neighborSurface, lightSample,
             RTXDI_INVALID_PORTAL_INDEX, true, false, false, attenuation);
 #else
-          sampleVisible = RAB_TraceLightSampleVisibility(neighborSurface, lightSample,
+          const bool sampleVisible = RAB_TraceLightSampleVisibility(neighborSurface, lightSample,
             state.portalIdx, true, false, false, attenuation);
 #endif
-        }
-
-        float ps = 0;
-        if (sampleVisible)
-        {
-          ps = RAB_GetLightSampleTargetPdfForSurface(lightSample, neighborSurface);
+          if (!sampleVisible)
+          {
+            ps = 0;
+          }
         }
 
         if (all(selectedID == neighborID))
@@ -811,8 +1108,11 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
         }
 
         // Add to the sums of weights for the (normalization) denominator
-        RTXDI_Reservoir neighborReservoir = RAB_LoadReservoir(neighborID, sparams.sourceBufferIndex);
-        piSum += ps * neighborReservoir.M;
+        const uint16_t neighborM = RAB_LoadReservoir(neighborID, sparams.sourceBufferIndex, neighborGlobalIndex).M;
+        previousNeighborIndex = neighborGlobalIndex;
+        previousNeighborPdf = ps;
+        previousNeighborM = neighborM;
+        piSum += ps * neighborM;
       }
       // Use "MIS-like" normalization
       RTXDI_FinalizeResampling(state, pi, piSum);
@@ -1371,6 +1671,11 @@ void RTXDI_FindGradientSampleAndBestLight(
     
     if (any(srcPixelPos >= int2(resolution)))
       continue;
+
+    if (!RAB_IsReservoirPixelActive(srcPixelPos, reservoirBufferIndex, false))
+    {
+      continue;
+    }
     
     const float currIlluminance = RAB_GetSurfaceIlluminance(srcPixelPos, false);
 
