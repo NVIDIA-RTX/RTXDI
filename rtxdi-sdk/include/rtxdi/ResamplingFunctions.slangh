@@ -562,13 +562,13 @@ void RTXDI_TemporalResampling(
   int2 prevPixelID = -1;
   float16_t3 prevNormal;
   // Compact reservoirs take the neighbor that temporal selection cached, so they skip the search.
-  const bool activeOnlyReuse = RAB_IsActiveOnlyReuseEnabled();
-  if (activeOnlyReuse)
+  const bool useSparseReservoirs = RAB_UseSparseReservoirs();
+  if (useSparseReservoirs)
   {
     prevPixelID = RAB_LoadTemporalNeighbor(prevNormal);
     isGBufferSimilar = prevPixelID.x >= 0;
   }
-  for (int i = 0; i < (activeOnlyReuse ? 0 : 9); i++)
+  for (int i = 0; i < (useSparseReservoirs ? 0 : 9); i++)
   {
     // First, look at the previous surface at the position pointed to by the motion vector.
     // If that surface doesn't match, try the surface at the same pixel, without the similarity test.
@@ -920,8 +920,8 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
     RTXDI_SpatialResamplingParameters sparams)
 {
   // Compact reservoirs merge the neighbors that spatial selection cached and validated.
-  const bool activeOnlyReuse = RAB_IsActiveOnlyReuseEnabled();
-  if (activeOnlyReuse)
+  const bool useSparseReservoirs = RAB_UseSparseReservoirs();
+  if (useSparseReservoirs)
   {
     sparams.numSamples = min(sparams.numSamples, uint(RTXDI_MAX_ACTIVE_NEIGHBORS));
   }
@@ -941,7 +941,7 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
     RAB_RandomSamplerState oldRng = rng;
 #endif
     uint activeNeighbors[RTXDI_MAX_ACTIVE_NEIGHBORS];
-    if (activeOnlyReuse)
+    if (useSparseReservoirs)
     {
       RAB_LoadSpatialNeighbors(activeNeighbors);
     }
@@ -952,7 +952,7 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
       int2 neighborID;
       uint neighborGlobalIndex = ~0u;
       RAB_Surface neighborSurface;
-      if (activeOnlyReuse)
+      if (useSparseReservoirs)
       {
         neighborGlobalIndex = RTXDI_GetSelectedActiveNeighbor(activeNeighbors, uint(i));
         neighborID = RAB_GetActiveNeighborPixel(neighborGlobalIndex);
@@ -1036,7 +1036,7 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
         int2 neighborID;
         uint neighborGlobalIndex = ~0u;
         RAB_Surface neighborSurface;
-        if (activeOnlyReuse)
+        if (useSparseReservoirs)
         {
           if ((validNeighborMask & (0x1 << i)) == 0)
           {
