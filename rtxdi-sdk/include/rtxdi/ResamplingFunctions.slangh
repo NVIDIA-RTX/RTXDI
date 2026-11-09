@@ -988,7 +988,7 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
         }
       }
 
-      RTXDI_Reservoir neighborReservoir = RAB_LoadReservoir(neighborID, sparams.sourceBufferIndex, neighborGlobalIndex);
+      RTXDI_Reservoir neighborReservoir = RAB_LoadReservoirAtIndex(neighborID, sparams.sourceBufferIndex, neighborGlobalIndex);
 
       if (RAB_UseLightIdentityResolution())
       {
@@ -1111,7 +1111,7 @@ RTXDI_Reservoir RTXDI_SpatialResampling(
         }
 
         // Add to the sums of weights for the (normalization) denominator
-        const uint16_t neighborM = RAB_LoadReservoir(neighborID, sparams.sourceBufferIndex, neighborGlobalIndex).M;
+        const uint16_t neighborM = RAB_LoadReservoirAtIndex(neighborID, sparams.sourceBufferIndex, neighborGlobalIndex).M;
         previousNeighborIndex = neighborGlobalIndex;
         previousNeighborPdf = ps;
         previousNeighborM = neighborM;
