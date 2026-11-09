@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "SparseNeighborSearchParameters.h"
 #include "Reservoir.slangh"
 
 #ifndef RTXDI_COHERENT_SPATIAL_NEIGHBOR_OFFSETS
@@ -486,6 +487,7 @@ int2 RTXDI_SelectActiveTemporalNeighbor(
     RAB_Surface surface,
     inout RAB_RandomSamplerState rng,
     RTXDI_TemporalResamplingParameters tparams,
+    RTXDI_SparseNeighborSearchParameters searchParams,
     out float16_t3 previousNormal)
 {
   previousNormal = float16_t3(0.0);
@@ -511,8 +513,8 @@ int2 RTXDI_SelectActiveTemporalNeighbor(
   const float centerDepth = max(tparams.expectedPrevHitDistance, 0.0);
   const float inversePositionSigma = rcp(max(centerDepth * sqrt(0.05 / pi), 1e-6));
   const RAB_NeighborBasis neighborBasis = RAB_InitNeighborBasis(tparams.prevPixelCenter, true, centerDepth * inversePositionSigma);
-  const uint candidateCount = max(cb.sparseRenderingArgs.rtxdiTemporalNeighborCandidateCount, 1u);
-  const float searchRadius = max(cb.sparseRenderingArgs.rtxdiTemporalNeighborSearchRadius, 0.0);
+  const uint candidateCount = max(searchParams.temporalCandidateCount, 1u);
+  const float searchRadius = max(searchParams.temporalSearchRadius, 0.0);
   float weightSum = 0.0;
   int2 selectedPixel = int2(-1);
 
@@ -838,6 +840,7 @@ void RTXDI_SelectActiveSpatialNeighbors(
     RAB_Surface centerSurface,
     inout RAB_RandomSamplerState rng,
     RTXDI_SpatialResamplingParameters sparams,
+    RTXDI_SparseNeighborSearchParameters searchParams,
     out uint selectedPixels[RTXDI_MAX_ACTIVE_NEIGHBORS])
 {
   const uint neighborCount = min(sparams.numSamples, uint(RTXDI_MAX_ACTIVE_NEIGHBORS));
@@ -846,8 +849,8 @@ void RTXDI_SelectActiveSpatialNeighbors(
   selectedPixels[2] = ~0u;
   selectedPixels[3] = ~0u;
 
-  const uint candidateCount = max(cb.sparseRenderingArgs.rtxdiSpatialNeighborCandidateCount, neighborCount);
-  const float searchRadius = max(cb.sparseRenderingArgs.rtxdiSpatialNeighborSearchRadius, 0.0);
+  const uint candidateCount = max(searchParams.spatialCandidateCount, neighborCount);
+  const float searchRadius = max(searchParams.spatialSearchRadius, 0.0);
   const float3 centerNormal = RAB_GetSurfaceNormal(centerSurface);
   const float centerDepth = max(RAB_GetSurfaceLinearDepth(centerSurface), 0.0);
   const float inversePositionSigma = rcp(max(centerDepth * sqrt(0.05 / pi), 1e-6));
