@@ -31,7 +31,6 @@
 #include <Rtxdi/LightSampling/PresamplingFunctions.hlsli>
 #include <Rtxdi/DI/InitialSampling.hlsli>
 #include <Rtxdi/DI/SpatialResampling.hlsli>
-#include <Rtxdi/DI/SpatioTemporalResampling.hlsli>
 #include <Rtxdi/DI/TemporalResampling.hlsli>
 #include <Rtxdi/PT/InitialSampling.hlsli>
 #include <Rtxdi/PT/TemporalResampling.hlsli>

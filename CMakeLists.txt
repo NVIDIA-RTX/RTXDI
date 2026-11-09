@@ -44,7 +44,12 @@ option(DONUT_WITH_DLSS "" ON)
 cmake_dependent_option(NVRHI_WITH_NVAPI "Include NVAPI support (requires NVAPI SDK)" ON "WIN32" OFF)
 set(NVAPI_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/External/NVAPI/" CACHE STRING "Path to NVAPI include headers/shaders" )
 if (WIN32)
-    set(NVAPI_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/External/NVAPI/amd64/nvapi64.lib" CACHE STRING "Path to NVAPI .lib file")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/External/donut/nvrhi/cmake/NvrhiTargetArch.cmake")
+    if (NVRHI_TARGET_ARCH STREQUAL "arm64")
+        set(NVAPI_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/External/NVAPI/aarch64/nvapia64.lib" CACHE STRING "Path to NVAPI .lib file")
+    else()
+        set(NVAPI_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/External/NVAPI/amd64/nvapi64.lib" CACHE STRING "Path to NVAPI .lib file")
+    endif()
 endif()
 
 # Helper to download and unzip a package from a URL

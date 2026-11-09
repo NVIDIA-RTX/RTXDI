@@ -31,6 +31,12 @@ set(folder "RTXDI SDK Tests")
 
 include(CMakeDependentOption)
 
+file(GLOB_RECURSE rtxdi_shader_dependencies
+    "${RTXDI_RUNTIME_INCLUDE_PATH}/*.h"
+    "${RTXDI_RUNTIME_INCLUDE_PATH}/*.hlsli"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.glsli"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Shaders/*.hlsli")
+
 add_library(${project} ${sources})
 target_compile_definitions(${project} PRIVATE IS_CONSOLE_APP=1)
 
@@ -47,7 +53,7 @@ if (DONUT_WITH_DX12)
 	add_custom_command(
 		OUTPUT ${output_file}
 		MAIN_DEPENDENCY ${source_file}
-		DEPENDS ${shader_dependencies}
+		DEPENDS ${rtxdi_shader_dependencies}
 		COMMAND ${DXC_PATH} -nologo -WX -Tcs_6_5 ${source_file} -Fo ${output_file} -I${RTXDI_RUNTIME_INCLUDE_PATH} -enable-16bit-types
 	)
 
@@ -66,7 +72,7 @@ if (DONUT_WITH_VULKAN)
 	add_custom_command(
 		OUTPUT ${output_file}
 		MAIN_DEPENDENCY ${source_file}
-		DEPENDS ${shader_dependencies}
+		DEPENDS ${rtxdi_shader_dependencies}
 		COMMAND ${DXC_SPIRV_PATH} -nologo -WX -Tcs_6_5 -fspv-target-env=vulkan1.2 ${source_file} -Fo ${output_file} -I${RTXDI_RUNTIME_INCLUDE_PATH} -enable-16bit-types
 	)
 
@@ -86,7 +92,7 @@ if (NOT ${GLSLANG_PATH} STREQUAL "")
 		add_custom_command(
 			OUTPUT ${output_file}
 			MAIN_DEPENDENCY ${source_file}
-			DEPENDS ${shader_dependencies}
+			DEPENDS ${rtxdi_shader_dependencies}
 			COMMAND ${GLSLANG_PATH} --target-env vulkan1.2 --quiet -S comp ${source_file} -o ${output_file} -I${RTXDI_RUNTIME_INCLUDE_PATH}
 		)
 

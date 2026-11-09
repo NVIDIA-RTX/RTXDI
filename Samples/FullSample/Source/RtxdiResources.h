@@ -14,6 +14,8 @@
 
 #include <nvrhi/nvrhi.h>
 
+enum class ReSTIRDI_SpatialSamplingMode : uint32_t;
+
 namespace rtxdi
 {
     class RISBufferSegmentAllocator;
@@ -32,6 +34,7 @@ public:
     nvrhi::BufferHandle RisBuffer;
     nvrhi::BufferHandle RisLightDataBuffer;
     nvrhi::BufferHandle NeighborOffsetsBuffer;
+    nvrhi::BufferHandle DINeighborOffsetsBuffer;
     nvrhi::BufferHandle DIReservoirBuffer;
     nvrhi::BufferHandle SecondaryGBuffer;
     nvrhi::TextureHandle EnvironmentPdfTexture;
@@ -51,7 +54,10 @@ public:
         uint32_t environmentMapWidth,
         uint32_t environmentMapHeight);
 
-    void InitializeNeighborOffsets(nvrhi::ICommandList* commandList, uint32_t neighborOffsetCount);
+    void InitializeNeighborOffsets(
+        nvrhi::ICommandList* commandList,
+        uint32_t neighborOffsetCount,
+        ReSTIRDI_SpatialSamplingMode samplingMode);
 
     uint32_t GetMaxEmissiveMeshes() const;
     uint32_t GetMaxEmissiveTriangles() const;
@@ -60,6 +66,7 @@ public:
 
 private:
     bool m_neighborOffsetsInitialized = false;
+    ReSTIRDI_SpatialSamplingMode m_neighborOffsetSamplingMode = {};
     uint32_t m_maxEmissiveMeshes = 0;
     uint32_t m_maxEmissiveTriangles = 0;
     uint32_t m_maxPrimitiveLights = 0;

@@ -14,6 +14,7 @@
 #define GI_RESERVOIR_VIZ_PARAMETERS_H
 
 #include <donut/shaders/view_cb.h>
+#include "ReservoirVisualizationParameters.h"
 #include <Rtxdi/RtxdiParameters.h>
 #include <Rtxdi/GI/ReSTIRGIParameters.h>
 
@@ -49,6 +50,7 @@ struct GIReservoirVizParameters
     uint pad1;
     uint pad2;
     uint pad3;
+    ReservoirVisualizationParameters visualization;
 };
 
 #endif // GI_RESERVOIR_VIZ_PARAMETERS_H

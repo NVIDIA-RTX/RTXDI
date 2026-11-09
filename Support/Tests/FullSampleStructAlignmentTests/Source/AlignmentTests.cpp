@@ -23,6 +23,7 @@ static_assert(sizeof(ShaderPrintCBData) % 16 == 0);
 static_assert(sizeof(PTPathVizPreprocessConstants) % 16 == 0);
 static_assert(sizeof(PTPathVizLineConstants) % 16 == 0);
 
+static_assert(sizeof(ReservoirVisualizationParameters) % 16 == 0);
 static_assert(sizeof(DIReservoirVizParameters) % 16 == 0);
 static_assert(sizeof(GIReservoirVizParameters) % 16 == 0);
 static_assert(sizeof(PTReservoirVizParameters) % 16 == 0);

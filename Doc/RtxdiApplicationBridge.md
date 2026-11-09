@@ -104,7 +104,7 @@ Returns the world space shading normal of the provided surface. Normals are used
 
 `float RAB_GetSurfaceLinearDepth(RAB_Surface surface)`
 
-Returns the linear depth of the provided surface. It doesn't have to be linear depth in a strict sense (i.e. `viewPosition.z`), and can be distance to the camera or primary path length instead. The motion vectors provided to `RTXDI_DITemporalResampling` or `RTXDI_DISpatioTemporalResampling` (ReSTIR DI), or to `RTXDI_GITemporalResampling` / `RTXDI_GISpatioTemporalResampling` (ReSTIR GI), must have their .z component computed as the difference between the linear depth of the same surface computed on the previous frame and the current frame.
+Returns the linear depth of the provided surface. It doesn't have to be linear depth in a strict sense (i.e. `viewPosition.z`), and can be distance to the camera or primary path length instead. The motion vectors provided to `RTXDI_DITemporalResampling` or to `RTXDI_GITemporalResampling` / `RTXDI_GISpatioTemporalResampling` must have their .z component computed as the difference between the linear depth of the same surface computed on the previous frame and the current frame.
 
 ### `RAB_ClampSamplePositionIntoView`
 
@@ -179,7 +179,7 @@ This function is used in the spatial resampling functions for ray traced bias co
 
 Same visibility ray tracing as [`RAB_GetConservativeVisibility`](#rab_getconservativevisibility) but for surfaces and light samples originating from the previous frame.
 
-When the previous frame TLAS and BLAS data is available, the implementation should use that previous data and the `prevSurface` parameter. When the previous acceleration structures are not available, the implementation should use the `currentSurface` parameter, but that will make the results temporarily biased and, in some cases, more noisy. Specifically, the fused spatiotemporal resampling algorithm will produce very noisy results on animated objects.
+When the previous frame TLAS and BLAS data is available, the implementation should use that previous data and the `prevSurface` parameter. When the previous acceleration structures are not available, the implementation should use the `currentSurface` parameter, but that will make the results temporarily biased and, in some cases, more noisy. Specifically, the ReSTIR GI fused spatiotemporal resampling algorithm will produce noisier results on animated objects.
 
 
 ## BRDF Sampling Related Functions

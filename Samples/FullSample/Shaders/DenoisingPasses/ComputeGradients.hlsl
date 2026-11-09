@@ -56,7 +56,7 @@ void RayGen()
             continue;
 
         // Find the matching pixel in the previous frame - that information is produced
-        // by the temporal resampling or fused resampling shaders.
+        // by the temporal resampling shader.
         int2 temporalPixelPos = u_TemporalSamplePositions[srcReservoirPos];
         int2 temporalReservoirPos = RTXDI_PixelPosToReservoirPos(temporalPixelPos, params.activeCheckerboardField);
 

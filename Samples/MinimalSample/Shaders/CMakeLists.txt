@@ -13,13 +13,17 @@ set(shaders
    RtxdiApplicationBridge/RAB_Surface.hlsli
    RtxdiApplicationBridge/RAB_VisibilityTest.hlsli
    RtxdiApplicationBridge/RtxdiApplicationBridge.hlsli
+   FinalShading.hlsl
+   GBufferFill.hlsl
    GBufferHelpers.hlsli
    HelperFunctions.hlsli
+   InitialSampling.hlsl
    PrepareLights.hlsl
    PrimaryRays.hlsli
-   Render.hlsl
    SceneGeometry.hlsli
    ShaderParameters.h
+   SpatialResampling.hlsl
+   TemporalResampling.hlsl
    TriangleLight.hlsli)
 
 # Organize MSVS filters (the little folders in the solution explorer) to match the folder structure

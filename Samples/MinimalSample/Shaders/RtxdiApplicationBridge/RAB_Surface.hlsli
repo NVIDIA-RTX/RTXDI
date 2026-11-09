@@ -59,29 +59,27 @@ float GetSurfaceDiffuseProbability(RAB_Surface surface)
     return sumWeights < 1e-7f ? 1.f : (diffuseWeight / sumWeights);
 }
 
-// Load a sample from the previous G-buffer.
+// Load a sample from the current or previous G-buffer.
 RAB_Surface RAB_GetGBufferSurface(int2 pixelPosition, bool prevFrame)
 {
     RAB_Surface surface = RAB_EmptySurface();
 
-    // We do not have access to the current G-buffer in this sample because it's using
-    // a single render pass with a fused resampling kernel, so just return an invalid surface.
-    // This should never happen though, as the fused kernel doesn't call RAB_GetGBufferSurface(..., false)
-    if (!prevFrame)
-        return surface;
-
-    const PlanarViewConstants view = g_Const.prevView;
+    PlanarViewConstants view = g_Const.view;
+    if (prevFrame)
+    {
+        view = g_Const.prevView;
+    }
 
     if (any(pixelPosition >= view.viewportSize))
         return surface;
 
-    surface.viewDepth = t_PrevGBufferDepth[pixelPosition];
+    surface.viewDepth = prevFrame ? t_PrevGBufferDepth[pixelPosition] : u_GBufferDepth[pixelPosition];
 
     if(surface.viewDepth == BACKGROUND_DEPTH)
         return surface;
 
-    surface.normal = octToNdirUnorm32(t_PrevGBufferNormals[pixelPosition]);
-    surface.geoNormal = octToNdirUnorm32(t_PrevGBufferGeoNormals[pixelPosition]);
+    surface.normal = octToNdirUnorm32(prevFrame ? t_PrevGBufferNormals[pixelPosition] : u_GBufferNormals[pixelPosition]);
+    surface.geoNormal = octToNdirUnorm32(prevFrame ? t_PrevGBufferGeoNormals[pixelPosition] : u_GBufferGeoNormals[pixelPosition]);
     float4 specularRough = Unpack_R8G8B8A8_Gamma_UFLOAT(t_PrevGBufferSpecularRough[pixelPosition]);
     surface.material = RAB_GetGBufferMaterial(pixelPosition, view, u_GBufferDiffuseAlbedo, u_GBufferSpecularRough);
     surface.worldPos = ViewDepthToWorldPos(view, pixelPosition, surface.viewDepth);

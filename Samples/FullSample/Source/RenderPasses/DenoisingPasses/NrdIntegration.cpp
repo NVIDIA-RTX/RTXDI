@@ -94,10 +94,15 @@ static nvrhi::Format GetNvrhiFormat(nrd::Format format)
     }
 }
 
+static void DestroyNrdInstance(nrd::Instance* instance)
+{
+    nrd::DestroyInstance(*instance);
+}
+
 NrdIntegration::NrdIntegration(nvrhi::IDevice* device, nrd::Denoiser denoiser)
     : m_device(device)
     , m_initialized(false)
-    , m_instance(nullptr)
+    , m_instance(nullptr, DestroyNrdInstance)
     , m_denoiser(denoiser)
     , m_bindingCache(device)
     , m_pixelOffsetPrev(0.0f, 0.0f)
@@ -120,7 +125,11 @@ bool NrdIntegration::Initialize(uint32_t width, uint32_t height)
     instanceCreationDesc.denoisersNum = dim(denoisers);
     instanceCreationDesc.denoisers = denoisers;
 
-    nrd::Result res = nrd::CreateInstance(instanceCreationDesc, m_instance);
+    m_initialized = false;
+    m_instance.reset();
+    nrd::Instance* instance = nullptr;
+    nrd::Result res = nrd::CreateInstance(instanceCreationDesc, instance);
+    m_instance.reset(instance);
 
     if (res != nrd::Result::SUCCESS)
         return false;

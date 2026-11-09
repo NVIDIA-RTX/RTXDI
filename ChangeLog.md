@@ -1,5 +1,39 @@
 # RTXDI SDK Change Log
 
+## 3.2.0
+
+**New features:**
+
+- Added optional ReSTIR DI temporal fallback sampling, matching GI's implementation. If temporal resampling fails, it takes a temporal sample from the same pixel (i.e. zero motion vector), bypasses the surface similarity test, and resamples from it.
+- Improved Full Sample DI, GI, and PT reservoir visualizations with field-specific controls, adjustable ranges, and status views with pixel counts.
+- Added stratified low-discrepancy sampling for ReSTIR DI spatial resampling, which uses low-discrepancy sampling within the four circular quadrants around a sample. All pixels across the frame then sample from the same quadrants at the same time, improving cache coherence and performance. Sample counts in this mode are limited to even numbers to prevent shimmering artifacts. Each complete group of four samples covers all four quadrants, and when a non-multiple-of-4 sample count is selected, the last two samples alternate opposite quadrants each frame: `0, 2` on even frames and `1, 3` on odd frames.
+
+**Breaking changes:**
+
+- Removed ReSTIR DI fused spatiotemporal resampling.
+- The Minimal Sample now uses individual render passes for G-buffer fill, initial sampling, temporal resampling, spatial resampling, and final shading.
+
+**Dependency updates:**
+
+- Updated Donut.
+- Updated NVAPI.
+
+**Fixed issues:**
+
+- Fixed NRD instance leaks in the Full Sample when switching denoisers or destroying the NRD integration.
+- Added DI prefixes and timing separators to the profiler and grouped the DI gradients pass with the other DI passes.
+- Split Full Sample denoiser profiler timings into NRD ReLAX, NRD ReBLUR, TAAU, DLSS-SR, DLSS-RR, Accumulation, and Resolve Blit sections.
+- Show the NRD version below the denoiser dropdown only when an NRD denoiser is selected.
+- Fixed the Full Sample running ReBLUR when `--denoiser.mode NRD_RELAX` was selected.
+- Fixed excessive DI reservoir weights when ray-traced bias correction combined the temporal visibility shortcut with reused final visibility. The separate temporal pass now requires fresh visibility at the previous source pixel before skipping its ray.
+- Avoided loading a light from an invalid reservoir when evaluating pairwise DI reuse samples.
+- Updated reservoir visualizations to use final shading inputs.
+
+**Updating from 3.1.0 to 3.2.0:**
+
+1. Make sure the neighbor offset buffer used for ReSTIR DI is generated using the corresponding option set for `RTXDI_DISpatialResamplingParameters::neighborOffsetSamplingMode`.
+2. Use even sample counts for DI spatial resampling when using stratified low discrepancy sampling. The Full Sample UI and presets enforce this, but the runtime still allows arbitrary sample counts.
+
 ## 3.1.0
 
 **Release highlights:**
@@ -92,7 +126,7 @@
 
 **Breaking changes:**
 
-- rtxdi-sdk folder moved into the [RTXDI Runtime](https://gitlab-master.nvidia.com/rtx/rtxdi-runtime) submodule.
+- rtxdi-sdk folder moved into the [RTXDI Runtime](https://github.com/NVIDIA-RTX/RTXDI-Library) submodule.
 
 **Fixed issues:**
 

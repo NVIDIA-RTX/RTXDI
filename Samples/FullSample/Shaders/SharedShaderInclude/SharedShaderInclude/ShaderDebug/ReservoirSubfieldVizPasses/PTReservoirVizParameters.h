@@ -14,6 +14,7 @@
 #define PT_RESERVOIR_VIZ_PARAMETERS_H
 
 #include <donut/shaders/view_cb.h>
+#include "ReservoirVisualizationParameters.h"
 #include <Rtxdi/RtxdiParameters.h>
 #include <Rtxdi/PT/ReSTIRPTParameters.h>
 
@@ -56,6 +57,7 @@ struct PTReservoirVizParameters
     uint pad1;
     uint pad2;
     uint pad3;
+    ReservoirVisualizationParameters visualization;
 };
 
 #endif // PT_RESERVOIR_VIZ_PARAMETERS_H

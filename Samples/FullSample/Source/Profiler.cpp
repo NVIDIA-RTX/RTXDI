@@ -27,10 +27,11 @@ static const char* g_SectionNames[ProfilerSection::Count] = {
     "Presample Lights",
     "Presample Env. Map",
     "ReGIR Build",
-    "Initial Samples",
-    "Temporal Resampling",
-    "Spatial Resampling",
-    "Shade Primary Surf.",
+    "DI - Initial Samples",
+    "DI - Temporal Resampling",
+    "DI - Spatial Resampling",
+    "DI - Shade Primary Surf.",
+    "DI - Gradients",
     "BRDF or MIS Rays",
     "Shade Secondary Surf.",
     "GI - Temporal Resampling",
@@ -44,10 +45,14 @@ static const char* g_SectionNames[ProfilerSection::Count] = {
     "PT - Compute Duplication Map",
     "PT - Compute Smoothed Duplication Map",
     "PT - Final Shading",
-    "Gradients",
-    "Denoising",
+    "NRD ReLAX",
+    "NRD ReBLUR",
     "Glass",
-    "TAA or DLSS",
+    "Resolve Blit",
+    "Accumulation",
+    "TAAU",
+    "DLSS-SR",
+    "DLSS-RR",
     "Frame Time (GPU)",
     "(Material Readback)"
 };
@@ -261,13 +266,19 @@ void Profiler::BuildUI(const bool enableRayCounts)
         ImGui::TableSetupColumn("Hits", ImGuiTableColumnFlags_WidthFixed, otherColumnsWidth);
     }
     ImGui::TableHeadersRow();
-    
+
+    bool separatorPending = false;
     for (uint32_t section = 0; section < ProfilerSection::MaterialReadback; section++)
     {
-        if (section == ProfilerSection::InitialSamples ||
-            section == ProfilerSection::Gradients || 
+        if (section == ProfilerSection::LocalLightPdfMap ||
+            section == ProfilerSection::DIInitialSamples ||
+            section == ProfilerSection::BrdfRays ||
+            section == ProfilerSection::PTGenerateInitialSamples ||
+            section == ProfilerSection::NrdRelax ||
             section == ProfilerSection::Frame)
-            ImGui::Separator();
+        {
+            separatorPending = true;
+        }
 
         const double time = GetTimer(ProfilerSection::Enum(section));
         const double rayCount = GetRayCount(ProfilerSection::Enum(section));
@@ -275,6 +286,14 @@ void Profiler::BuildUI(const bool enableRayCounts)
         
         if (time == 0.0 && rayCount == 0.0)
             continue;
+
+        if (separatorPending)
+        {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Separator();
+            separatorPending = false;
+        }
 
         const bool highlightRow = (section == ProfilerSection::Frame);
 

@@ -45,6 +45,7 @@ class DebugVizPasses;
 class DIReservoirVizPass;
 class GIReservoirVizPass;
 class PTReservoirVizPass;
+class ReservoirVisualizationReadback;
 class PTPathVizPass;
 
 namespace donut
@@ -150,9 +151,6 @@ public:
 
     void UpdateReGIRContextFromUI();
 
-    RTXDI_DISpatioTemporalResamplingParameters SpatioTemporalParamsFromIndividualParams(const RTXDI_DITemporalResamplingParameters& tParams,
-        const RTXDI_DISpatialResamplingParameters& sParams);
-
     RTXDI_GISpatioTemporalResamplingParameters SpatioTemporalParamsFromIndividualParams(const RTXDI_GITemporalResamplingParameters& tParams,
         const RTXDI_GISpatialResamplingParameters& sParams);
 
@@ -234,6 +232,7 @@ private:
     std::unique_ptr<DIReservoirVizPass> m_diReservoirVizPass;
     std::unique_ptr<GIReservoirVizPass> m_giReservoirVizPass;
     std::unique_ptr<PTReservoirVizPass> m_ptReservoirVizPass;
+    std::unique_ptr<ReservoirVisualizationReadback> m_reservoirVisualizationReadback;
     std::unique_ptr<PTPathVizPass> m_ptPathVizPass;
     std::unique_ptr<ShaderPrintReadbackPass> m_shaderDebugPrintPass;
     std::unique_ptr<VisualizationPass> m_visualizationPass;

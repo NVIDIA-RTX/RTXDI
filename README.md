@@ -1,7 +1,7 @@
 
 # RTXDI SDK and Sample Applications
 
-Version 3.1.0
+Version 3.2.0
 
 [Change Log](ChangeLog.md)
 
@@ -25,7 +25,7 @@ For an academic presentation on the ReSTIR family of algorithms, see the SIGGRAP
 - [`Rtxdi/Include/Rtxdi/DI/`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Include/Rtxdi/DI), [`Rtxdi/Include/Rtxdi/GI/`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Include/Rtxdi/GI), and [`Rtxdi/Include/Rtxdi/PT/`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Include/Rtxdi/PT) are the main shader include folders that contain the resampling implementations for their respective algorithms.
 - [`Rtxdi/Source`](https://github.com/NVIDIA-RTX/RTXDI-Library/tree/main/Source) has the host code with various utility functions for setting up the parameters and resources for resampling.
 
-[`Samples`](Samples) contains two sample projects, [`MinimalSample`](Samples/MinimalSample) and [`FullSample`](Samples/FullSample). The [`MinimalSample/Source`](Samples/MinimalSample/Source) project implements ReSTIR DI in a single combined pass to show a minimum viable implementation. The [`FullSample/Source`](Samples/FullSample/Source) project implements ReSTIR DI in several passes integrated into a broader rendering pipeline to show a more standard implementation. The shaders for each project live in their respective [`MinimalSample/Shaders`](Samples/MinimalSample/Shaders) and [`FullSample/Shaders`](Samples/FullSample/Shaders) folders.
+[`Samples`](Samples) contains two sample projects, [`MinimalSample`](Samples/MinimalSample) and [`FullSample`](Samples/FullSample). The [`MinimalSample/Source`](Samples/MinimalSample/Source) project provides a minimum viable integration of ReSTIR DI with only a handful of UI options and no extra features like denoisers. The [`FullSample/Source`](Samples/FullSample/Source) project integrates ReSTIR DI, GI, and PT into a broader rendering pipeline to show a more standard implementation. The shaders for each project live in their respective [`MinimalSample/Shaders`](Samples/MinimalSample/Shaders) and [`FullSample/Shaders`](Samples/FullSample/Shaders) folders.
 
 [`External`](External) contains project dependencies both from Nvidia and third parties:
 
@@ -33,7 +33,7 @@ For an academic presentation on the ReSTIR family of algorithms, see the SIGGRAP
 
 - `External/NRD` is a Git submodule with the ["NRD" denoiser library](https://github.com/NVIDIA-RTX/NRD).
 
-- `External/DLSS` is a Git submodule with the [Deep Learning Super-Sampling SDK](https://github.com/NVIDIA/DLSS).
+- `External/donut/thirdparty/DLSS` contains the [Deep Learning Super-Sampling SDK](https://github.com/NVIDIA/DLSS), fetched by Donut during CMake configuration when `DONUT_WITH_DLSS` is enabled.
 
 - `External/dxc` is a recent version of DirectX Shader Compiler. However, unlike the other dependencies, it is not a Git submodule but is instead fetched by CMake at project configuration time.
 
@@ -68,7 +68,7 @@ For an academic presentation on the ReSTIR family of algorithms, see the SIGGRAP
 	- "Where is the source code" to `D:\RTXDI`
 	- "Where to build the binaries" to `D:\RTXDI\build`
 
-5. Click "Configure", set "Generator" to the Visual Studio you're using (tested with VS 2019 version 16.8.2), set "Optional platform" to x64, click "Finish".
+5. Click "Configure", set "Generator" to "Visual Studio 17 2022", set "Optional platform" to x64, click "Finish".
 
 6. Click "Generate", then "Open Project".
 
@@ -78,7 +78,7 @@ For an academic presentation on the ReSTIR family of algorithms, see the SIGGRAP
 
 ### Linux
 
-1. Make sure the necessary build packages are installed on the target system. For Ubuntu 20.04 (amd64), the following command is sufficient:
+1. Install the build packages on the target system. On Debian/Ubuntu, start with the following command, then ensure your CMake and compiler meet the requirements above:
 	- `sudo apt install build-essential cmake xorg-dev libtinfo5`
 
 2. Install LFS support by following the instructions on [git-lfs.com](https://git-lfs.com). Note that on Ubunutu 21.04+ you can simply:
@@ -105,7 +105,7 @@ For an academic presentation on the ReSTIR family of algorithms, see the SIGGRAP
 
 ### Vulkan support
 
-The RTXDI sample applications can run using D3D12 or Vulkan, which is achieved through the [NVRHI](https://github.com/NVIDIA-RTX/NVRHI) rendering API abstraction layer and HLSL shader compilation to SPIR-V through DXC (DirectX Shader Compiler). We deliver a compatible version of DXC through packman. If you wish to use a different (e.g. newer) version of DXC, it can be obtained from [Microsoft/DirectXShaderCompiler](https://github.com/Microsoft/DirectXShaderCompiler) on GitHub. The path to a custom version of DXC can be configured using the `DXC_PATH` and `DXC_SPIRV_PATH` CMake variables.
+The RTXDI sample applications can run using D3D12 or Vulkan, which is achieved through the [NVRHI](https://github.com/NVIDIA-RTX/NVRHI) rendering API abstraction layer and HLSL shader compilation to SPIR-V through DXC (DirectX Shader Compiler). CMake downloads a compatible version of DXC during configuration. If you wish to use a different (e.g. newer) version of DXC, it can be obtained from [Microsoft/DirectXShaderCompiler](https://github.com/Microsoft/DirectXShaderCompiler) on GitHub. The path to a custom version of DXC can be configured using the `DXC_PATH` and `DXC_SPIRV_PATH` CMake variables.
 
 By default, the sample apps will run using D3D12 on Windows. To start them in Vulkan mode, add `--device.vk` to the command line. To compile the sample apps without Vulkan support, set the CMake variable `DONUT_WITH_VULKAN` to `OFF` and re-generate the project.
 

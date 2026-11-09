@@ -118,6 +118,9 @@ RtxdiResources::RtxdiResources(
     neighborOffsetBufferDesc.keepInitialState = true;
     NeighborOffsetsBuffer = device->createBuffer(neighborOffsetBufferDesc);
 
+    neighborOffsetBufferDesc.debugName = "DINeighborOffsets";
+    DINeighborOffsetsBuffer = device->createBuffer(neighborOffsetBufferDesc);
+
 
     nvrhi::BufferDesc diReservoirBufferDesc;
     diReservoirBufferDesc.byteSize = sizeof(RTXDI_PackedDIReservoir) * context.GetReservoirBufferParameters().reservoirArrayPitch * rtxdi::c_NumReSTIRDIReservoirBuffers;
@@ -188,19 +191,30 @@ RtxdiResources::RtxdiResources(
     SpatialNeighborSelectionBuffer = device->createBuffer(spatialNeighborSelectionDesc);
 }
 
-void RtxdiResources::InitializeNeighborOffsets(nvrhi::ICommandList* commandList, uint32_t neighborOffsetCount)
+void RtxdiResources::InitializeNeighborOffsets(
+    nvrhi::ICommandList* commandList,
+    uint32_t neighborOffsetCount,
+    ReSTIRDI_SpatialSamplingMode samplingMode)
 {
-    if (m_neighborOffsetsInitialized)
+    if (m_neighborOffsetsInitialized && m_neighborOffsetSamplingMode == samplingMode)
+    {
         return;
+    }
 
     std::vector<uint8_t> offsets;
     offsets.resize(neighborOffsetCount * 2);
 
-    rtxdi::FillNeighborOffsetBuffer(offsets.data(), neighborOffsetCount);
+    if (!m_neighborOffsetsInitialized)
+    {
+        rtxdi::FillNeighborOffsetBuffer(offsets.data(), neighborOffsetCount);
+        commandList->writeBuffer(NeighborOffsetsBuffer, offsets.data(), offsets.size());
+    }
 
-    commandList->writeBuffer(NeighborOffsetsBuffer, offsets.data(), offsets.size());
+    rtxdi::FillNeighborOffsetBuffer(offsets.data(), neighborOffsetCount, samplingMode);
+    commandList->writeBuffer(DINeighborOffsetsBuffer, offsets.data(), offsets.size());
 
     m_neighborOffsetsInitialized = true;
+    m_neighborOffsetSamplingMode = samplingMode;
 }
 
 uint32_t RtxdiResources::GetMaxEmissiveMeshes() const

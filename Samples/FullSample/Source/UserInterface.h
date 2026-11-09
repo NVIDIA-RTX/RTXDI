@@ -13,6 +13,7 @@
 #pragma once
 
 #include <memory>
+#include "ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationControls.h"
 
 #include <Rtxdi/DI/ReSTIRDI.h>
 #include <Rtxdi/GI/ReSTIRGI.h>
@@ -94,6 +95,8 @@ struct UIResources
 
     std::shared_ptr<SampleScene> scene;
     donut::app::FirstPersonCamera* camera = nullptr;
+    // World-space origin of the rendered view, including animated benchmark cameras.
+    dm::float3 renderedCameraPosition = dm::float3(0.f);
 
     std::vector<std::shared_ptr<donut::engine::IesProfile>> iesProfiles;
 
@@ -162,6 +165,7 @@ struct UIDebugOutputSettings
         DIReservoirField diReservoirVizField = DIReservoirField::DI_RESERVOIR_FIELD_UV_DATA;
         GIReservoirField giReservoirVizField = GIReservoirField::GI_RESERVOIR_FIELD_POSITION;
         PTReservoirField ptReservoirVizField = PTReservoirField::PT_RESERVOIR_FIELD_TRANSLATED_WORLD_POSITION;
+    ReservoirVisualizationSettings reservoirVisualization = CreateReservoirVisualizationSettings();
     VisualizationOverlayMode visualizationOverlayMode = VisualizationOverlayMode::VISUALIZATION_OVERLAY_MODE_NONE;
 
     struct
@@ -231,7 +235,6 @@ struct UIData
     NrdIntegrationDebugSettings nrdDebugSettings = {};
     float debug = 0.0f;
     float accumulationTime = 0.334f; // (sec) 20 frames @ 60 FPS
-    nrd::Denoiser nrdDenoisingMethod = nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR;
     nrd::ReblurSettings reblurSettings = {};
     nrd::RelaxSettings relaxSettings = {};
     void SetDefaultDenoiserSettings();
@@ -285,7 +288,6 @@ struct UIData
         RTXDI_DITemporalResamplingParameters temporalResamplingParams;
         RTXDI_BoilingFilterParameters boilingFilter;
         RTXDI_DISpatialResamplingParameters spatialResamplingParams;
-        RTXDI_DISpatioTemporalResamplingParameters spatioTemporalResamplingParams;
         RTXDI_ShadingParameters shadingParams;
     } restirDI;
 
@@ -321,6 +323,7 @@ struct UIData
     UIData();
 
     void ApplyPreset();
+    bool NormalizeDISpatialSampleCounts();
     void ApplyReSTIRPTPreset();
 
     // Applies a quality-preset-independent DLSS-RR mode with robust input-noise

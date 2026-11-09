@@ -73,7 +73,6 @@ private:
     RayTracingPass m_generateInitialSamplesPass;
     RayTracingPass m_temporalResamplingPass;
     RayTracingPass m_spatialResamplingPass;
-    RayTracingPass m_fusedResamplingPass;
     RayTracingPass m_shadeSamplesPass;
     RayTracingPass m_gradientsPass;
 };

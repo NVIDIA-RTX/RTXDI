@@ -45,14 +45,11 @@ struct ResamplingConstants
     RTXDI_RuntimeParameters runtimeParams;
     RTXDI_LightBufferParameters lightBufferParams;
     RTXDI_ReservoirBufferParameters restirDIReservoirBufferParams;
+    RTXDI_DIBufferIndices bufferIndices;
 
     RTXDI_DIInitialSamplingParameters initialSamplingParams;
-    RTXDI_DISpatioTemporalResamplingParameters spatioTemporalResamplingParams;
-
-    uint enableResampling;
-    uint inputBufferIndex;
-    uint outputBufferIndex;
-    uint pad;
+    RTXDI_DITemporalResamplingParameters temporalResamplingParams;
+    RTXDI_DISpatialResamplingParameters spatialResamplingParams;
 };
 
 // See TriangleLight.hlsli for encoding format

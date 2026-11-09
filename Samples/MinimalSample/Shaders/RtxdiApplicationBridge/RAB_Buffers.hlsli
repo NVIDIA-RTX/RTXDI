@@ -29,6 +29,7 @@ RWTexture2D<uint> u_GBufferNormals : register(u3);
 RWTexture2D<uint> u_GBufferGeoNormals : register(u4);
 RWTexture2D<uint> u_GBufferDiffuseAlbedo : register(u5);
 RWTexture2D<uint> u_GBufferSpecularRough : register(u6);
+RWTexture2D<float4> u_MotionVectors : register(u7);
 
 // Other
 ConstantBuffer<ResamplingConstants> g_Const : register(b0);

@@ -2,6 +2,10 @@ set(project FullSample)
 set(folder "RTXDI SDK")
 
 set(sources
+    "ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationReadback.cpp"
+    "ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationReadback.h"
+    "ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationControls.cpp"
+    "ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationControls.h"
 	"App/CommandLineArgs.h"
 	"App/CommandLineArgs.cpp"
 	"App/LoggingCallback.h"

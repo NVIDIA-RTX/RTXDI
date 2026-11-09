@@ -26,6 +26,7 @@ public:
     nvrhi::TextureHandle PrevGBufferSpecularRough;
     nvrhi::TextureHandle PrevGBufferNormals;
     nvrhi::TextureHandle PrevGBufferGeoNormals;
+    nvrhi::TextureHandle MotionVectors;
     
     nvrhi::TextureHandle HdrColor;
 

@@ -77,12 +77,15 @@ void UserInterface::buildUI()
         ImGui::Checkbox("Enable Resampling", &m_ui.lightingSettings.enableResampling);
         
         ImGui::Checkbox("Unbiased Mode", &m_ui.lightingSettings.unbiasedMode);
-        m_ui.lightingSettings.spaioTemporalResamplingParams.biasCorrectionMode = m_ui.lightingSettings.unbiasedMode ?
-            ReSTIRDI_SpatioTemporalBiasCorrectionMode::Raytraced :
-            ReSTIRDI_SpatioTemporalBiasCorrectionMode::Basic;
+        m_ui.lightingSettings.temporalResamplingParams.biasCorrectionMode = m_ui.lightingSettings.unbiasedMode ?
+            ReSTIRDI_TemporalBiasCorrectionMode::Raytraced :
+            ReSTIRDI_TemporalBiasCorrectionMode::Basic;
+        m_ui.lightingSettings.spatialResamplingParams.biasCorrectionMode = m_ui.lightingSettings.unbiasedMode ?
+            ReSTIRDI_SpatialBiasCorrectionMode::Raytraced :
+            ReSTIRDI_SpatialBiasCorrectionMode::Basic;
 
         ImGui::SliderInt("Initial Samples", (int*)&m_ui.lightingSettings.initialSamplingParams.numLocalLightSamples, 1, 32);
-        ImGui::SliderInt("Spatial Samples", (int*)&m_ui.lightingSettings.spaioTemporalResamplingParams.numSamples, 0, 4);
+        ImGui::SliderInt("Spatial Samples", (int*)&m_ui.lightingSettings.spatialResamplingParams.numSamples, 0, 4);
         ImGui::SliderInt("Initial BRDF Samples", (int*)&m_ui.lightingSettings.initialSamplingParams.numBrdfSamples, 0, 8);
         ImGui::SliderFloat("BRDF Cutoff", (float*)&m_ui.lightingSettings.initialSamplingParams.brdfCutoff, 0.0f, 1.0f);
 

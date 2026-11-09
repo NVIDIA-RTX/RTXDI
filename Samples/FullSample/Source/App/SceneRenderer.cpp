@@ -60,6 +60,7 @@ using namespace donut::math;
 #include "ShaderDebug/ReservoirSubfieldVizPasses/DIReservoirVizPass.h"
 #include "ShaderDebug/ReservoirSubfieldVizPasses/GIReservoirVizPass.h"
 #include "ShaderDebug/ReservoirSubfieldVizPasses/PTReservoirVizPass.h"
+#include "ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationReadback.h"
 #include "ShaderDebug/PTPathViz/PTPathVizPass.h"
 
 struct DefaultCameraSettingsForScene
@@ -623,7 +624,8 @@ void SceneRenderer::UpdateEnvironmentMap()
             auto& environmentMaps = m_scene->GetEnvironmentMaps();
             const std::string& environmentMapPath = environmentMaps[m_ui.environmentMapIndex];
 
-            m_environmentMap = m_TextureCache->LoadTextureFromFileDeferred(environmentMapPath, false);
+            m_environmentMap = m_TextureCache->LoadTextureFromFileDeferred(environmentMapPath,
+                donut::engine::TextureLoadOptions{ donut::engine::SRGBMode::ForceLinear });
 
             if (m_TextureCache->IsTextureLoaded(m_environmentMap))
             {
@@ -671,6 +673,7 @@ void SceneRenderer::SetupView(uint32_t renderWidth, uint32_t renderHeight, const
     else
         m_view.SetMatrices(m_camera.GetWorldToViewMatrix(), perspProjD3DStyleReverse(radians(m_ui.verticalFov), aspectRatio, 0.01f));
     m_view.UpdateCache();
+    m_ui.resources->renderedCameraPosition = m_view.GetViewOrigin();
 
     if (m_viewPrevious.GetViewExtent().width() == 0)
         m_viewPrevious = m_view;
@@ -767,6 +770,16 @@ void SceneRenderer::SetupRenderPasses(uint32_t renderWidth, uint32_t renderHeigh
 
     UpdateRtxdiResources();
 
+    if (!m_reservoirVisualizationReadback)
+    {
+        m_reservoirVisualizationReadback = std::make_unique<ReservoirVisualizationReadback>(GetDevice());
+    }
+    if (renderTargetsCreated || m_rtxdiResourcesCreated || m_ui.reloadShaders)
+    {
+        m_reservoirVisualizationReadback->Invalidate();
+        m_ui.debugOutputSettings.reservoirVisualization.statistics = {};
+    }
+
     if (!m_environmentMapPdfMipmapPass || m_rtxdiResourcesCreated)
     {
         m_environmentMapPdfMipmapPass = std::make_unique<GenerateMipsPass>(
@@ -850,31 +863,24 @@ void SceneRenderer::SetupRenderPasses(uint32_t renderWidth, uint32_t renderHeigh
 
     }
 
-    if (!m_diReservoirVizPass || renderTargetsCreated)
+    if (!m_diReservoirVizPass || renderTargetsCreated || m_rtxdiResourcesCreated)
     {
         m_diReservoirVizPass = std::make_unique<DIReservoirVizPass>(GetDevice(), m_shaderFactory, m_scene, m_bindlessLayout);
-        m_diReservoirVizPass->CreateBindingSet(m_rtxdiResources->DIReservoirBuffer, m_renderTargets->DebugColor, m_lightingPasses->GetConstantBuffer());
+        m_diReservoirVizPass->CreateBindingSet(m_rtxdiResources->DIReservoirBuffer, m_renderTargets->DebugColor, m_lightingPasses->GetConstantBuffer(), m_reservoirVisualizationReadback->GetCounterBuffer());
     }
 
-    if (!m_giReservoirVizPass || renderTargetsCreated)
+    if (!m_giReservoirVizPass || renderTargetsCreated || m_rtxdiResourcesCreated)
     {
         m_giReservoirVizPass = std::make_unique<GIReservoirVizPass>(GetDevice(), m_shaderFactory, m_scene, m_bindlessLayout);
-        m_giReservoirVizPass->CreateBindingSet(m_rtxdiResources->GIReservoirBuffer, m_renderTargets->DebugColor);
+        m_giReservoirVizPass->CreateBindingSet(m_rtxdiResources->GIReservoirBuffer, m_renderTargets->DebugColor, m_reservoirVisualizationReadback->GetCounterBuffer());
     }
 
-    if (!m_ptReservoirVizPass || renderTargetsCreated)
+    if (!m_ptReservoirVizPass || renderTargetsCreated || m_rtxdiResourcesCreated)
     {
         m_ptReservoirVizPass = std::make_unique<PTReservoirVizPass>(GetDevice(), m_shaderFactory, m_scene, m_bindlessLayout);
-        m_ptReservoirVizPass->CreateBindingSet(m_rtxdiResources->PTReservoirBuffer, m_renderTargets->DebugColor, m_lightingPasses->GetConstantBuffer());
+        m_ptReservoirVizPass->CreateBindingSet(m_rtxdiResources->PTReservoirBuffer, m_renderTargets->DebugColor, m_lightingPasses->GetConstantBuffer(), m_reservoirVisualizationReadback->GetCounterBuffer());
     }
 
-#if WITH_NRD
-    if (!m_nrd)
-    {
-        m_nrd = std::make_unique<NrdIntegration>(GetDevice(), m_ui.nrdDenoisingMethod);
-        m_nrd->Initialize(m_renderTargets->Size.x, m_renderTargets->Size.y);
-    }
-#endif
 #if DONUT_WITH_DLSS
     if(!m_dlssInitAttempted)
     {
@@ -889,6 +895,18 @@ void SceneRenderer::SetupRenderPasses(uint32_t renderWidth, uint32_t renderHeigh
         m_ui.denoiserMode = DenoiserMode::NRD_REBLUR;
         if (m_ui.autoApplyDLSSRRPreset)
             m_ui.ApplyNonDLSSRRPreset();
+    }
+#endif
+
+#if WITH_NRD
+    // Derive the implementation from the selected mode even when the settings UI is hidden.
+    const nrd::Denoiser nrdDenoiser = m_ui.denoiserMode == DenoiserMode::NRD_RELAX
+        ? nrd::Denoiser::RELAX_DIFFUSE_SPECULAR
+        : nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR;
+    if (!m_nrd || m_nrd->GetDenoiser() != nrdDenoiser)
+    {
+        m_nrd = std::make_unique<NrdIntegration>(GetDevice(), nrdDenoiser);
+        m_nrd->Initialize(m_renderTargets->Size.x, m_renderTargets->Size.y);
     }
 #endif
 }
@@ -923,25 +941,6 @@ void SceneRenderer::UpdateReGIRContextFromUI()
     regirContext.SetDynamicParameters(dynamicParams);
 }
 
-RTXDI_DISpatioTemporalResamplingParameters SceneRenderer::SpatioTemporalParamsFromIndividualParams(const RTXDI_DITemporalResamplingParameters& tParams,
-    const RTXDI_DISpatialResamplingParameters& sParams)
-{
-    RTXDI_DISpatioTemporalResamplingParameters stParams = {};
-    stParams.biasCorrectionMode = static_cast<ReSTIRDI_SpatioTemporalBiasCorrectionMode>(sParams.biasCorrectionMode);
-    stParams.depthThreshold = tParams.depthThreshold;
-    stParams.discountNaiveSamples = sParams.discountNaiveSamples;
-    stParams.enableMaterialSimilarityTest = sParams.enableMaterialSimilarityTest;
-    stParams.enablePermutationSampling = tParams.enablePermutationSampling;
-    stParams.enableVisibilityShortcut = tParams.enableVisibilityShortcut;
-    stParams.maxHistoryLength = tParams.maxHistoryLength;
-    stParams.normalThreshold = tParams.normalThreshold;
-    stParams.numDisocclusionBoostSamples = sParams.numDisocclusionBoostSamples;
-    stParams.numSamples = sParams.numSamples;
-    stParams.samplingRadius = sParams.samplingRadius;
-    stParams.uniformRandomNumber = tParams.uniformRandomNumber;
-    return stParams;
-}
-
 RTXDI_GISpatioTemporalResamplingParameters SceneRenderer::SpatioTemporalParamsFromIndividualParams(const RTXDI_GITemporalResamplingParameters& tParams,
     const RTXDI_GISpatialResamplingParameters& sParams)
 {
@@ -969,7 +968,6 @@ void SceneRenderer::UpdateReSTIRDIContextFromUI()
     restirDIContext.SetTemporalResamplingParameters(m_ui.restirDI.temporalResamplingParams);
     restirDIContext.SetBoilingFilterParameters(m_ui.restirDI.boilingFilter);
     restirDIContext.SetSpatialResamplingParameters(m_ui.restirDI.spatialResamplingParams);
-    restirDIContext.SetSpatioTemporalResamplingParameters(SpatioTemporalParamsFromIndividualParams(m_ui.restirDI.temporalResamplingParams, m_ui.restirDI.spatialResamplingParams));
     restirDIContext.SetShadingParameters(m_ui.restirDI.shadingParams);
 }
 
@@ -1035,11 +1033,6 @@ void SceneRenderer::RenderScene(nvrhi::IFramebuffer* framebuffer)
 
     RunBenchmarkAnimation(activeCamera, effectiveFrameIndex);
     EnforceFpsLimit();
-
-#if WITH_NRD
-    if (m_nrd && m_nrd->GetDenoiser() != m_ui.nrdDenoisingMethod)
-        m_nrd = nullptr; // need to create a new one
-#endif
 
     if (m_ui.resetISContext)
     {
@@ -1111,7 +1104,10 @@ void SceneRenderer::RenderScene(nvrhi::IFramebuffer* framebuffer)
 
     AssignIesProfiles(m_commandList);
     m_scene->RefreshBuffers(m_commandList, GetFrameIndex());
-    m_rtxdiResources->InitializeNeighborOffsets(m_commandList, m_isContext->GetNeighborOffsetCount()); // TODO Move to be next to other RTXDI passes?
+    const auto& restirDIStaticParams = m_isContext->GetReSTIRDIContext().GetStaticParameters();
+    const auto& restirDISpatialParams = m_isContext->GetReSTIRDIContext().GetSpatialResamplingParameters();
+    m_rtxdiResources->InitializeNeighborOffsets(m_commandList, restirDIStaticParams.NeighborOffsetCount,
+        restirDISpatialParams.neighborOffsetSamplingMode);
     UpdateAccelerationStructure();
     EnvironmentMap();
     nvrhi::utils::ClearColorAttachment(m_commandList, framebuffer, 0, nvrhi::Color(0.f));
@@ -1161,6 +1157,7 @@ void SceneRenderer::RenderScene(nvrhi::IFramebuffer* framebuffer)
     m_commandList->close();
     GetDevice()->executeCommandList(m_commandList);
 
+    m_reservoirVisualizationReadback->NotifySubmitted();
     ProcessScreenshotFrame();
     OutputShaderMessages();
 
@@ -1519,6 +1516,10 @@ void SceneRenderer::ApplyNrdCheckerboardSettings()
 LightingPasses::RenderSettings SceneRenderer::GetFullyProcessedLightingSettings(uint32_t denoiserMode, bool enableDirectReStirPass)
 {
     LightingPasses::RenderSettings lightingSettings = m_ui.lightingSettings;
+    // Primary and secondary DI reuse share the same neighbor offset buffer.
+    const ReSTIRDI_SpatialSamplingMode neighborOffsetSamplingMode = m_isContext->GetReSTIRDIContext().GetSpatialResamplingParameters().neighborOffsetSamplingMode;
+    lightingSettings.brdfptParams.secondarySurfaceReSTIRDIParams.spatialResamplingParams.neighborOffsetSamplingMode = neighborOffsetSamplingMode;
+    lightingSettings.ptParameters.nee.spatialResamplingParams.neighborOffsetSamplingMode = neighborOffsetSamplingMode;
     lightingSettings.enablePrevTLAS &= m_ui.enableAnimations;
 #if WITH_NRD
     lightingSettings.reblurHitDistanceParams = &m_ui.reblurSettings.hitDistanceParameters;
@@ -1612,10 +1613,11 @@ void SceneRenderer::Denoiser(const LightingPasses::RenderSettings& lightingSetti
 #if WITH_NRD
         if (m_ui.denoiserMode == DenoiserMode::NRD_RELAX || m_ui.denoiserMode == DenoiserMode::NRD_REBLUR)
         {
-            ProfilerScope scope(*m_profiler, m_commandList, ProfilerSection::Denoising);
-            m_commandList->beginMarker("Denoising - NRD");
+            const bool useReLAX = m_nrd->GetDenoiser() == nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
+            ProfilerScope scope(*m_profiler, m_commandList, useReLAX ? ProfilerSection::NrdRelax : ProfilerSection::NrdReblur);
+            m_commandList->beginMarker(useReLAX ? "Denoising - NRD ReLAX" : "Denoising - NRD ReBLUR");
 
-            const void* methodSettings = (m_ui.nrdDenoisingMethod == nrd::Denoiser::RELAX_DIFFUSE_SPECULAR)
+            const void* methodSettings = useReLAX
                 ? (void*)&m_ui.relaxSettings
                 : (void*)&m_ui.reblurSettings;
 
@@ -1667,13 +1669,12 @@ donut::render::DLSS::EvaluateParameters SceneRenderer::GetDLSSRRParams() const
 
 void SceneRenderer::ResolveAA(nvrhi::ICommandList* commandList, float accumulationWeight) const
 {
-    ProfilerScope scope(*m_profiler, commandList, ProfilerSection::Resolve);
-
 #if DONUT_WITH_DLSS
     // DLSS-RR is a denoiser mode that also performs the post-processing resolve (denoise + upscale),
     // so when it's selected it takes over here regardless of the AA mode.
     if (m_ui.denoiserMode == DenoiserMode::DLSS_RR)
     {
+        ProfilerScope scope(*m_profiler, commandList, ProfilerSection::DlssRr);
         donut::render::DLSS::EvaluateParameters params = GetDLSSRRParams();
         m_dlssRR->Evaluate(commandList, params, m_view);
         return;
@@ -1685,6 +1686,7 @@ void SceneRenderer::ResolveAA(nvrhi::ICommandList* commandList, float accumulati
     switch (aaMode)
     {
     case AntiAliasingMode::None: {
+        ProfilerScope scope(*m_profiler, commandList, ProfilerSection::ResolveBlit);
         engine::BlitParameters blitParams;
         blitParams.sourceTexture = m_renderTargets->HdrColor;
         blitParams.sourceBox.m_maxs.x = m_view.GetViewport().width() / m_upscaledView.GetViewport().width();
@@ -1695,12 +1697,14 @@ void SceneRenderer::ResolveAA(nvrhi::ICommandList* commandList, float accumulati
     }
 
     case AntiAliasingMode::Accumulation: {
+        ProfilerScope scope(*m_profiler, commandList, ProfilerSection::Accumulation);
         m_accumulationPass->Render(commandList, m_view, m_upscaledView, accumulationWeight);
         m_CommonPasses->BlitTexture(commandList, m_renderTargets->ResolvedFramebuffer->GetFramebuffer(m_upscaledView), m_renderTargets->AccumulatedColor);
         break;
     }
 
     case AntiAliasingMode::TAA: {
+        ProfilerScope scope(*m_profiler, commandList, ProfilerSection::Taa);
         auto taaParams = m_ui.taaParams;
         if (m_ui.resetAccumulation)
             taaParams.newFrameWeight = 1.f;
@@ -1711,6 +1715,7 @@ void SceneRenderer::ResolveAA(nvrhi::ICommandList* commandList, float accumulati
 
 #if DONUT_WITH_DLSS
     case AntiAliasingMode::DLSS_SR: {
+        ProfilerScope scope(*m_profiler, commandList, ProfilerSection::DlssSr);
         donut::render::DLSS::EvaluateParameters params = GetDLSSSRParams();
         m_dlssSR->Evaluate(commandList, params, m_view);
         break;
@@ -1865,28 +1870,38 @@ void SceneRenderer::DebugVisualizationOverlayPass(nvrhi::IFramebuffer* framebuff
 
 void SceneRenderer::DebugReservoirSubfieldVizPass(nvrhi::IFramebuffer* framebuffer)
 {
+    auto& settings = m_ui.debugOutputSettings;
+    m_reservoirVisualizationReadback->BeginFrame(m_commandList, GetReservoirVisualizationFieldIndex(settings),
+        GetReservoirVisualizationParameters(settings), m_renderFrameIndex,
+        m_view.GetViewExtent().width(), m_view.GetViewExtent().height());
+    settings.reservoirVisualization.statistics = m_reservoirVisualizationReadback->GetStatistics();
     switch (m_ui.debugOutputSettings.reservoirSubfieldVizMode)
     {
     case ReservoirSubfieldVizMode::DIReservoir:
     {
         auto& diContext = m_isContext->GetReSTIRDIContext();
-        m_diReservoirVizPass->Render(m_commandList, m_view, m_isContext->GetReSTIRDIContext().GetRuntimeParams(), diContext.GetReservoirBufferParameters(), diContext.GetBufferIndices(), m_ui.debugOutputSettings.diReservoirVizField, m_prepareLightsPass->GetMaxLightsInBuffer());
+        m_diReservoirVizPass->Render(m_commandList, m_view, m_isContext->GetReSTIRDIContext().GetRuntimeParams(), diContext.GetReservoirBufferParameters(), diContext.GetBufferIndices(), m_ui.debugOutputSettings.diReservoirVizField, m_prepareLightsPass->GetMaxLightsInBuffer(), GetReservoirVisualizationParameters(m_ui.debugOutputSettings));
     }
     break;
     case ReservoirSubfieldVizMode::GIReservoir:
     {
         auto& giContext = m_isContext->GetReSTIRGIContext();
-        m_giReservoirVizPass->Render(m_commandList, m_view, m_isContext->GetReSTIRDIContext().GetRuntimeParams(), giContext.GetReservoirBufferParameters(), giContext.GetBufferIndices(), m_ui.debugOutputSettings.giReservoirVizField);
+        m_giReservoirVizPass->Render(m_commandList, m_view, m_isContext->GetReSTIRDIContext().GetRuntimeParams(), giContext.GetReservoirBufferParameters(), giContext.GetBufferIndices(), m_ui.debugOutputSettings.giReservoirVizField, GetReservoirVisualizationParameters(m_ui.debugOutputSettings));
     }
     break;
     case ReservoirSubfieldVizMode::PTReservoir:
     {
         auto& ptContext = m_isContext->GetReSTIRPTContext();
-        m_ptReservoirVizPass->Render(m_commandList, m_view, m_isContext->GetReSTIRDIContext().GetRuntimeParams(), ptContext.GetReservoirBufferParameters(), ptContext.GetBufferIndices(), m_ui.debugOutputSettings.ptReservoirVizField);
+        m_ptReservoirVizPass->Render(m_commandList, m_view, m_isContext->GetReSTIRDIContext().GetRuntimeParams(), ptContext.GetReservoirBufferParameters(), ptContext.GetBufferIndices(), m_ui.debugOutputSettings.ptReservoirVizField, GetReservoirVisualizationParameters(m_ui.debugOutputSettings));
     }
     break;
     }
-    m_CommonPasses->BlitTexture(m_commandList, framebuffer, m_renderTargets->DebugColor, &m_bindingCache);
+    m_reservoirVisualizationReadback->Capture(m_commandList);
+    donut::engine::BlitParameters blitParameters;
+    blitParameters.targetFramebuffer = framebuffer;
+    blitParameters.sourceTexture = m_renderTargets->DebugColor;
+    blitParameters.sampler = donut::engine::BlitSampler::Point;
+    m_CommonPasses->BlitTexture(m_commandList, blitParameters, &m_bindingCache);
 }
 
 void SceneRenderer::DebugTextureBlit(nvrhi::IFramebuffer* framebuffer)
@@ -2042,6 +2057,11 @@ void SceneRenderer::DebugOutputPass(nvrhi::IFramebuffer* framebuffer)
 
 void SceneRenderer::FinalFramebufferOutput(nvrhi::IFramebuffer* framebuffer)
 {
+    if (m_ui.debugOutputSettings.renderOutputMode != DebugRenderOutputMode::ReservoirSubfield)
+    {
+        m_reservoirVisualizationReadback->Invalidate();
+        m_ui.debugOutputSettings.reservoirVisualization.statistics = {};
+    }
     if (m_ui.debugOutputSettings.renderOutputMode == DebugRenderOutputMode::Off)
     {
         m_CommonPasses->BlitTexture(m_commandList, framebuffer, m_renderTargets->LdrColor, &m_bindingCache);

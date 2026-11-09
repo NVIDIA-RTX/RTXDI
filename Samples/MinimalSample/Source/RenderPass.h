@@ -13,6 +13,7 @@
 #include <donut/core/math/math.h>
 #include <nvrhi/nvrhi.h>
 #include <memory>
+#include <array>
 #include "Rtxdi/DI/ReSTIRDIParameters.h"
 
 namespace donut::engine
@@ -35,7 +36,8 @@ class EnvironmentLight;
 struct ResamplingConstants;
 
 RTXDI_DIInitialSamplingParameters GetDefaultMinimalSampleInitialSamplingParams();
-RTXDI_DISpatioTemporalResamplingParameters GetDefaultMinimalSpaioTemporalParams();
+RTXDI_DITemporalResamplingParameters GetDefaultMinimalTemporalParams();
+RTXDI_DISpatialResamplingParameters GetDefaultMinimalSpatialParams();
 
 class RenderPass
 {
@@ -46,7 +48,8 @@ public:
         bool enableResampling = true;
 
         RTXDI_DIInitialSamplingParameters initialSamplingParams = GetDefaultMinimalSampleInitialSamplingParams();
-        RTXDI_DISpatioTemporalResamplingParameters spaioTemporalResamplingParams = GetDefaultMinimalSpaioTemporalParams();
+        RTXDI_DITemporalResamplingParameters temporalResamplingParams = GetDefaultMinimalTemporalParams();
+        RTXDI_DISpatialResamplingParameters spatialResamplingParams = GetDefaultMinimalSpatialParams();
     };
 
     RenderPass(
@@ -76,8 +79,11 @@ public:
 private:
     nvrhi::DeviceHandle m_device;
 
-    nvrhi::ShaderHandle m_computeShader;
-    nvrhi::ComputePipelineHandle m_computePipeline;
+    nvrhi::ComputePipelineHandle m_gBufferPipeline;
+    nvrhi::ComputePipelineHandle m_initialSamplingPipeline;
+    nvrhi::ComputePipelineHandle m_temporalPipeline;
+    nvrhi::ComputePipelineHandle m_spatialPipeline;
+    nvrhi::ComputePipelineHandle m_finalShadingPipeline;
 
     nvrhi::BindingLayoutHandle m_bindingLayout;
     nvrhi::BindingLayoutHandle m_bindlessLayout;
@@ -85,6 +91,10 @@ private:
     nvrhi::BindingSetHandle m_prevBindingSet;
     nvrhi::BufferHandle m_constantBuffer;
     nvrhi::BufferHandle m_lightReservoirBuffer;
+    std::array<nvrhi::TextureHandle, 5> m_currentGBufferTextures;
+    std::array<nvrhi::TextureHandle, 5> m_previousGBufferTextures;
+    nvrhi::TextureHandle m_motionVectors;
+    nvrhi::TextureHandle m_shadingOutput;
 
     std::shared_ptr<donut::engine::ShaderFactory> m_shaderFactory;
     std::shared_ptr<donut::engine::CommonRenderPasses> m_commonPasses;

@@ -59,6 +59,7 @@ void PTReservoirVizPass::CreateBindingLayout()
     bindingLayoutDesc.bindings = {
         nvrhi::BindingLayoutItem::StructuredBuffer_UAV(0),
         nvrhi::BindingLayoutItem::Texture_UAV(1),
+        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(2),
         nvrhi::BindingLayoutItem::VolatileConstantBuffer(0),
         nvrhi::BindingLayoutItem::VolatileConstantBuffer(1)
     };
@@ -77,13 +78,14 @@ void PTReservoirVizPass::CreatePipeline()
     m_computePipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
-void PTReservoirVizPass::CreateBindingSet(nvrhi::BufferHandle src, nvrhi::TextureHandle dst, nvrhi::BufferHandle cbuf)
+void PTReservoirVizPass::CreateBindingSet(nvrhi::BufferHandle src, nvrhi::TextureHandle dst, nvrhi::BufferHandle cbuf, nvrhi::IBuffer* counters)
 {
     nvrhi::BindingSetDesc bindingSetDesc;
 
     bindingSetDesc.bindings = {
         nvrhi::BindingSetItem::StructuredBuffer_UAV(0, src),
         nvrhi::BindingSetItem::Texture_UAV(1, dst),
+        nvrhi::BindingSetItem::StructuredBuffer_UAV(2, counters),
         nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer),
         nvrhi::BindingSetItem::ConstantBuffer(1, cbuf)
     };
@@ -97,17 +99,19 @@ void PTReservoirVizPass::Render(
     RTXDI_RuntimeParameters runtimeParams,
     RTXDI_ReservoirBufferParameters reservoirBufferParams,
     RTXDI_PTBufferIndices bufferIndices,
-    PTReservoirField ptReservoirField)
+    PTReservoirField ptReservoirField,
+    const ReservoirVisualizationParameters& visualization)
 {
     commandList->beginMarker(m_gpuPerfMarker.c_str());
 
-    PTReservoirVizParameters cbData;
+    PTReservoirVizParameters cbData = {};
     view.FillPlanarViewConstants(cbData.view);
     cbData.runtimeParams = runtimeParams;
     cbData.reservoirBufferParams = reservoirBufferParams;
     cbData.bufferIndices = bufferIndices;
     cbData.ptReservoirField = ptReservoirField;
 
+    cbData.visualization = visualization;
     commandList->writeBuffer(m_constantBuffer, &cbData, sizeof(cbData));
 
     nvrhi::ComputeState state;

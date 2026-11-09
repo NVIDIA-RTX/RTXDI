@@ -49,6 +49,7 @@ Buffer<uint> t_LightIndexMappingBuffer : register(t22);
 Texture2D t_EnvironmentPdfTexture : register(t23);
 Texture2D t_LocalLightPdfTexture : register(t24);
 StructuredBuffer<uint> t_GeometryInstanceToLight : register(t25);
+Buffer<float2> t_DINeighborOffsets : register(t26);
 
 // Screen-sized UAVs
 RWStructuredBuffer<RTXDI_PackedDIReservoir> u_LightReservoirs : register(u0);
@@ -108,6 +109,7 @@ SamplerState s_EnvironmentSampler : register(s1);
 #define RTXDI_RIS_BUFFER u_RisBuffer
 #define RTXDI_LIGHT_RESERVOIR_BUFFER u_LightReservoirs
 #define RTXDI_NEIGHBOR_OFFSETS_BUFFER t_NeighborOffsets
+#define RTXDI_DI_NEIGHBOR_OFFSETS_BUFFER t_DINeighborOffsets
 #define RTXDI_GI_RESERVOIR_BUFFER u_GIReservoirs
 #define RTXDI_PT_RESERVOIR_BUFFER u_PTReservoirs
 #define RTXDI_SPATIAL_NEIGHBOR_SELECTION_BUFFER u_SpatialNeighborSelection

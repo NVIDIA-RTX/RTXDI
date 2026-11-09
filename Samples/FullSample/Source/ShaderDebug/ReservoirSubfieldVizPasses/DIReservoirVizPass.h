@@ -24,6 +24,7 @@ namespace donut::engine
 }
 
 struct RTXDI_RuntimeParameters;
+struct ReservoirVisualizationParameters;
 struct RTXDI_ReservoirBufferParameters;
 struct RTXDI_DIBufferIndices;
 enum class DIReservoirField;
@@ -41,7 +42,7 @@ public:
         std::shared_ptr<donut::engine::Scene> scene,
         nvrhi::IBindingLayout* bindlessLayout);
 
-    void CreateBindingSet(nvrhi::BufferHandle src, nvrhi::TextureHandle dst, nvrhi::BufferHandle cbuf);
+    void CreateBindingSet(nvrhi::BufferHandle src, nvrhi::TextureHandle dst, nvrhi::BufferHandle cbuf, nvrhi::IBuffer* counters);
 
     void Render(
         nvrhi::ICommandList* commandList,
@@ -50,7 +51,8 @@ public:
         RTXDI_ReservoirBufferParameters reservoirBufferParams,
         RTXDI_DIBufferIndices bufferIndices,
         DIReservoirField diReservoirField,
-        uint32_t maxLightsInBuffer);
+        uint32_t maxLightsInBuffer,
+        const ReservoirVisualizationParameters& visualization);
 
 private:
     void CreateBindingLayout();

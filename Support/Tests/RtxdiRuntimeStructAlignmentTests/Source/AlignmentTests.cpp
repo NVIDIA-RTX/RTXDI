@@ -10,10 +10,10 @@
 // constant buffers are 16-byte aligned.
 
 static_assert(sizeof(RTXDI_DIBufferIndices) % 16 == 0);
+static_assert(sizeof(RTXDI_RuntimeParameters) % 16 == 0);
 static_assert(sizeof(RTXDI_DIInitialSamplingParameters) % 16 == 0);
 static_assert(sizeof(RTXDI_DITemporalResamplingParameters) % 16 == 0);
 static_assert(sizeof(RTXDI_DISpatialResamplingParameters) % 16 == 0);
-static_assert(sizeof(RTXDI_DISpatioTemporalResamplingParameters) % 16 == 0);
 static_assert(sizeof(RTXDI_ShadingParameters) % 16 == 0);
 static_assert(sizeof(RTXDI_Parameters) % 16 == 0);
 

@@ -39,6 +39,11 @@ public:
 
     ~RenderEnvironmentMapPass();
 
+    RenderEnvironmentMapPass(const RenderEnvironmentMapPass&) = delete;
+    RenderEnvironmentMapPass& operator=(const RenderEnvironmentMapPass&) = delete;
+    RenderEnvironmentMapPass(RenderEnvironmentMapPass&&) = delete;
+    RenderEnvironmentMapPass& operator=(RenderEnvironmentMapPass&&) = delete;
+
     void Render(nvrhi::ICommandList* commandList, const donut::engine::DirectionalLight& light, const donut::render::SkyParameters& params);
 
     nvrhi::ITexture* GetTexture() const;

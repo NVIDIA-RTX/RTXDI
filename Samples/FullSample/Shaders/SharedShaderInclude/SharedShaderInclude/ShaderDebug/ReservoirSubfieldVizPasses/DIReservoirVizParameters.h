@@ -14,6 +14,7 @@
 #define DI_RESERVOIR_VIZ_PARAMETERS_H
 
 #include <donut/shaders/view_cb.h>
+#include "ReservoirVisualizationParameters.h"
 #include <Rtxdi/RtxdiParameters.h>
 #include <Rtxdi/DI/ReSTIRDIParameters.h>
 
@@ -51,6 +52,7 @@ struct DIReservoirVizParameters
     uint maxLightsInBuffer;
     uint pad1;
     uint pad2;
+    ReservoirVisualizationParameters visualization;
 };
 
 #endif // DI_RESERVOIR_VIZ_PARAMETERS_H

@@ -12,6 +12,8 @@
 
 #include <nvrhi/nvrhi.h>
 
+enum class ReSTIRDI_SpatialSamplingMode : uint32_t;
+
 namespace rtxdi
 {
     class ReSTIRDIContext;
@@ -33,7 +35,10 @@ public:
         uint32_t maxEmissiveTriangles,
         uint32_t maxMeshInstances);
 
-    void InitializeNeighborOffsets(nvrhi::ICommandList* commandList, uint32_t neighborOffsetCount);
+    void InitializeNeighborOffsets(
+        nvrhi::ICommandList* commandList,
+        uint32_t neighborOffsetCount,
+        ReSTIRDI_SpatialSamplingMode samplingMode);
 
     uint32_t GetMaxEmissiveMeshes() const;
     uint32_t GetMaxEmissiveTriangles() const;
@@ -41,6 +46,7 @@ public:
 
 private:
     bool m_neighborOffsetsInitialized;
+    ReSTIRDI_SpatialSamplingMode m_neighborOffsetSamplingMode = {};
     uint32_t m_maxEmissiveMeshes;
     uint32_t m_maxEmissiveTriangles;
     uint32_t m_maxGeometryInstances;

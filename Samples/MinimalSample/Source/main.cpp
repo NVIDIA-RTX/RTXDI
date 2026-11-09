@@ -275,6 +275,9 @@ public:
             m_rtxdiResources = std::make_unique<RtxdiResources>(GetDevice(), *m_restirDIContext,
                 numEmissiveMeshes, numEmissiveTriangles, numGeometryInstances);
 
+            // All reservoir slots start empty, including previous-frame history.
+            m_commandList->clearBufferUInt(m_rtxdiResources->LightReservoirBuffer, 0);
+
             m_prepareLightsPass->CreateBindingSet(*m_rtxdiResources);
             
             rtxdiResourcesCreated = true;
@@ -304,16 +307,19 @@ public:
         // Setup the viewports and transforms
         SetupView(fbinfo, GetFrameIndex());
 
+        m_commandList->open();
+
         // Make sure that the passes and buffers are created and fit the current render size
         SetupRenderPasses(fbinfo);
-        
-        m_commandList->open();
 
         // Compute transforms, update the scene representation on the GPU in case something's animated
         m_scene->Refresh(m_commandList, GetFrameIndex());
 
-        // Write the neighbor offset buffer data (only happens once)
-        m_rtxdiResources->InitializeNeighborOffsets(m_commandList, m_restirDIContext->GetStaticParameters().NeighborOffsetCount);
+        // Write the neighbor offsets on first use or when the sampling pattern changes.
+        const auto& restirDIStaticParams = m_restirDIContext->GetStaticParameters();
+        m_rtxdiResources->InitializeNeighborOffsets(
+            m_commandList, restirDIStaticParams.NeighborOffsetCount,
+            m_ui.lightingSettings.spatialResamplingParams.neighborOffsetSamplingMode);
         
         // The light indexing members of frameParameters are written by PrepareLightsPass below
         m_restirDIContext->SetFrameIndex(GetFrameIndex());
@@ -322,7 +328,7 @@ public:
         // but it's simpler to do so.
         RTXDI_LightBufferParameters lightBufferParams = m_prepareLightsPass->Process(m_commandList);
 
-        // Call the rendering pass - this includes primary rays, fused resampling, and shading
+        // Fill the G-buffer, then run ReSTIR DI sampling, resampling, and final shading.
         m_renderPass->Render(m_commandList,
             *m_restirDIContext,
             m_view, m_viewPrevious,

@@ -37,7 +37,6 @@
 #include "Rtxdi/LightSampling/PresamplingFunctions.hlsli"
 #include "Rtxdi/DI/InitialSampling.hlsli"
 #include "Rtxdi/DI/SpatialResampling.hlsli"
-#include "Rtxdi/DI/SpatioTemporalResampling.hlsli"
 #include "Rtxdi/DI/TemporalResampling.hlsli"
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;

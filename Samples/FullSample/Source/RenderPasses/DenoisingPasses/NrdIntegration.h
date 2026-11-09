@@ -15,6 +15,7 @@
 #if WITH_NRD
 
 #include <NRD.h>
+#include <memory>
 #include <nvrhi/nvrhi.h>
 #include <unordered_map>
 #include <donut/engine/BindingCache.h>
@@ -53,7 +54,7 @@ public:
 private:
     nvrhi::DeviceHandle m_device;
     bool m_initialized;
-    nrd::Instance* m_instance;
+    std::unique_ptr<nrd::Instance, void (*)(nrd::Instance*)> m_instance;
     nrd::Denoiser m_denoiser;
 
     struct NrdPipeline

@@ -2,11 +2,13 @@
 include("${DONUT_PATH}/compileshaders.cmake")
 
 set(shaders
+   ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationOutput.hlsli
+   ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualization.hlsli
+   SharedShaderInclude/SharedShaderInclude/ShaderDebug/ReservoirSubfieldVizPasses/ReservoirVisualizationParameters.h
    DenoisingPasses/ComputeGradients.hlsl
    DenoisingPasses/ConfidencePass.hlsl
    DenoisingPasses/DLSSRRInputFormattingPass.hlsl
    DenoisingPasses/FilterGradientsPass.hlsl
-   LightingPasses/DI/FusedResampling.hlsl
    LightingPasses/DI/GenerateInitialSamples.hlsl
    LightingPasses/DI/ShadeSamples.hlsl
    LightingPasses/DI/SpatialResampling.hlsl

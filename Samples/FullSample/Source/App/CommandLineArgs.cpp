@@ -139,9 +139,6 @@ std::istream& operator>> (std::istream& is, ReSTIRDI_ResamplingMode& mode)
         mode = rtxdi::ReSTIRDI_ResamplingMode::Spatial;
     else if (s == "TEMPORAL_SPATIAL")
         mode = rtxdi::ReSTIRDI_ResamplingMode::TemporalAndSpatial;
-    else if (s == "FUSED")
-        mode = rtxdi::ReSTIRDI_ResamplingMode::FusedSpatiotemporal;
-
     else
         throw cxxopts::exceptions::exception("Unrecognized value passed to the --di-mode argument.");
 
@@ -246,26 +243,6 @@ std::istream& operator>> (std::istream& is, ReSTIRDI_SpatialBiasCorrectionMode& 
         mode = ReSTIRDI_SpatialBiasCorrectionMode::Raytraced;
     else
         throw cxxopts::exceptions::exception("Unrecognized value passed to the --restirDI.spatialResampling.biasCorrectionMode argument.");
-
-    return is;
-}
-
-std::istream& operator>> (std::istream& is, ReSTIRDI_SpatioTemporalBiasCorrectionMode& mode)
-{
-    std::string s;
-    is >> s;
-    toupper(s);
-
-    if (s == "OFF")
-        mode = ReSTIRDI_SpatioTemporalBiasCorrectionMode::Off;
-    else if (s == "BASIC")
-        mode = ReSTIRDI_SpatioTemporalBiasCorrectionMode::Basic;
-    else if (s == "PAIRWISE")
-        mode = ReSTIRDI_SpatioTemporalBiasCorrectionMode::Pairwise;
-    else if (s == "RAYTRACED")
-        mode = ReSTIRDI_SpatioTemporalBiasCorrectionMode::Raytraced;
-    else
-        throw cxxopts::exceptions::exception("Unrecognized value passed to a --restirDI.*biasCorrectionMode argument.");
 
     return is;
 }
@@ -395,15 +372,6 @@ std::istream& operator>> (std::istream& is, ReSTIRPTPresetCommand& command)
     return is;
 }
 
-template<typename T>
-std::istream& operator>> (std::istream& is, std::optional<T>& data)
-{
-    T output;
-    is >> output;
-    data = output;
-    return is;
-}
-
 void ProcessCommandLine(int argc, char** argv, const std::string& appTitle, donut::app::DeviceCreationParameters& deviceParams, UIData& ui, CommandLineArguments& args)
 {
     using namespace cxxopts;
@@ -411,20 +379,26 @@ void ProcessCommandLine(int argc, char** argv, const std::string& appTitle, donu
     Options options(argv[0], appTitle.c_str());
 
     ibool checkerboard = false;
-    std::string denoiserMode;
     bool help = false;
     bool useVk = false;
     ibool dlssRRPreset = false;
     ReSTIRPTPresetCommand restirPTPreset{ &ui };
 
+    // cxxopts can't parse std::optional<T> on GCC (its optional overload isn't found by name lookup),
+    // so parse into plain values and only copy over the ones that were actually passed.
+    float3 cameraDirection{};
+    float cameraMoveSpeed = 0.f;
+    float3 cameraPosition{};
+    float cameraRotationSpeed = 0.f;
+
     options.add_options()
         ("h,help", "Display this help message", value(help))
 
         // Camera
-        ("camera.direction", "Camera direction", value(args.appStartupSettings.cameraDirection))
-        ("camera.moveSpeed", "Camera movement speed", value(args.appStartupSettings.cameraMovementSpeed))
-        ("camera.position", "Camera position", value(args.appStartupSettings.cameraPosition))
-        ("camera.rotationSpeed", "Camera rotation speed", value(args.appStartupSettings.cameraRotateSpeed))
+        ("camera.direction", "Camera direction", value(cameraDirection))
+        ("camera.moveSpeed", "Camera movement speed", value(cameraMoveSpeed))
+        ("camera.position", "Camera position", value(cameraPosition))
+        ("camera.rotationSpeed", "Camera rotation speed", value(cameraRotationSpeed))
 
         // Debug
         ("d", "Enable the DX12 or Vulkan validation layers (0/1)", value(deviceParams.enableDebugRuntime)) // Periods in names preclude single letter special case
@@ -484,7 +458,7 @@ void ProcessCommandLine(int argc, char** argv, const std::string& appTitle, donu
 
         // ReSTIR DI (dynamic + static used at context creation)
         ("restirDI.checkerboard", "Use checkerboard rendering (0/1)", value(checkerboard))
-        ("restirDI.diMode", "ReSTIR DI resampling mode: OFF, TEMPORAL, SPATIAL, TEMPORAL_SPATIAL, FUSED", value(ui.restirDI.resamplingMode))
+        ("restirDI.diMode", "ReSTIR DI resampling mode: OFF, TEMPORAL, SPATIAL, TEMPORAL_SPATIAL", value(ui.restirDI.resamplingMode))
         ("restirDI.preset", "Rendering settings preset: FAST, MEDIUM, UNBIASED, ULTRA, REFERENCE", value(ui))
 
         ("restirDI.initialSampling.numLocalLightSamples", "ReSTIR DI: initial sampling num local light samples (overridden by NEE counts for active mode unless you match them)", value(ui.restirDI.initialSamplingParams.numLocalLightSamples))
@@ -507,6 +481,7 @@ void ProcessCommandLine(int argc, char** argv, const std::string& appTitle, donu
         ("restirDI.temporalResampling.normalThreshold", "ReSTIR DI: temporal normal threshold", value(ui.restirDI.temporalResamplingParams.normalThreshold))
         ("restirDI.temporalResampling.enableVisibilityShortcut", "ReSTIR DI: temporal visibility shortcut (0/1)", value(ui.restirDI.temporalResamplingParams.enableVisibilityShortcut))
         ("restirDI.temporalResampling.enablePermutationSampling", "ReSTIR DI: temporal permutation sampling (0/1)", value(ui.restirDI.temporalResamplingParams.enablePermutationSampling))
+        ("restirDI.temporalResampling.enableFallbackSampling", "ReSTIR DI: try zero-motion fallback after reprojection search fails in the separate temporal pass (0/1)", value(ui.restirDI.temporalResamplingParams.enableFallbackSampling))
         ("restirDI.temporalResampling.uniformRandomNumber", "ReSTIR DI: permutation uniform random seed", value(ui.restirDI.temporalResamplingParams.uniformRandomNumber))
         ("restirDI.temporalResampling.permutationSamplingThreshold", "ReSTIR DI: permutation sampling threshold", value(ui.restirDI.temporalResamplingParams.permutationSamplingThreshold))
 
@@ -592,7 +567,12 @@ void ProcessCommandLine(int argc, char** argv, const std::string& appTitle, donu
 
     try
     {
-        options.parse(argc, argv);
+        const auto parsed = options.parse(argc, argv);
+
+        if (parsed.count("camera.direction"))     args.appStartupSettings.cameraDirection     = cameraDirection;
+        if (parsed.count("camera.moveSpeed"))     args.appStartupSettings.cameraMovementSpeed = cameraMoveSpeed;
+        if (parsed.count("camera.position"))      args.appStartupSettings.cameraPosition      = cameraPosition;
+        if (parsed.count("camera.rotationSpeed")) args.appStartupSettings.cameraRotateSpeed   = cameraRotationSpeed;
 
         ui.restirDI.neeLocalLightSampling.localLightSamplingMode = ui.restirDI.initialSamplingParams.localLightSamplingMode;
 
@@ -604,21 +584,6 @@ void ProcessCommandLine(int argc, char** argv, const std::string& appTitle, donu
             printf("%s", options.help().c_str());
 #endif
             exit(0);
-        }
-        
-        if (!denoiserMode.empty())
-        {
-#if WITH_NRD
-            std::transform(denoiserMode.begin(), denoiserMode.end(), denoiserMode.begin(),
-                [](unsigned char c) { return std::toupper(c); });
-
-            if (denoiserMode == "REBLUR")
-                ui.nrdDenoisingMethod = nrd::Denoiser::REBLUR_DIFFUSE_SPECULAR;
-            else if (denoiserMode == "RELAX")
-                ui.nrdDenoisingMethod = nrd::Denoiser::RELAX_DIFFUSE_SPECULAR;
-            else
-                throw cxxopts::exceptions::exception("Unrecognized value passed to the --denoiser argument.");
-#endif
         }
     }
     catch (const std::exception& e)

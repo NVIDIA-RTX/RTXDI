@@ -59,6 +59,7 @@ void GIReservoirVizPass::CreateBindingLayout()
     bindingLayoutDesc.bindings = {
         nvrhi::BindingLayoutItem::StructuredBuffer_UAV(0),
         nvrhi::BindingLayoutItem::Texture_UAV(1),
+        nvrhi::BindingLayoutItem::StructuredBuffer_UAV(2),
         nvrhi::BindingLayoutItem::VolatileConstantBuffer(0)
     };
 
@@ -76,13 +77,14 @@ void GIReservoirVizPass::CreatePipeline()
     m_computePipeline = m_device->createComputePipeline(pipelineDesc);
 }
 
-void GIReservoirVizPass::CreateBindingSet(nvrhi::BufferHandle src, nvrhi::TextureHandle dst)
+void GIReservoirVizPass::CreateBindingSet(nvrhi::BufferHandle src, nvrhi::TextureHandle dst, nvrhi::IBuffer* counters)
 {
     nvrhi::BindingSetDesc bindingSetDesc;
 
     bindingSetDesc.bindings = {
         nvrhi::BindingSetItem::StructuredBuffer_UAV(0, src),
         nvrhi::BindingSetItem::Texture_UAV(1, dst),
+        nvrhi::BindingSetItem::StructuredBuffer_UAV(2, counters),
         nvrhi::BindingSetItem::ConstantBuffer(0, m_constantBuffer)
     };
 
@@ -95,7 +97,8 @@ void GIReservoirVizPass::Render(
     RTXDI_RuntimeParameters runtimeParams,
     RTXDI_ReservoirBufferParameters reservoirBufferParams,
     RTXDI_GIBufferIndices bufferIndices,
-    GIReservoirField giReservoirField)
+    GIReservoirField giReservoirField,
+    const ReservoirVisualizationParameters& visualization)
 {
     commandList->beginMarker(m_gpuPerfMarker.c_str());
 
@@ -105,6 +108,7 @@ void GIReservoirVizPass::Render(
     cbData.reservoirBufferParams = reservoirBufferParams;
     cbData.bufferIndices = bufferIndices;
     cbData.giReservoirField = giReservoirField;
+    cbData.visualization = visualization;
     commandList->writeBuffer(m_constantBuffer, &cbData, sizeof(cbData));
 
     nvrhi::ComputeState state;

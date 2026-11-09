@@ -69,6 +69,7 @@ BRDFPathTracing_SecondarySurfaceReSTIRDIParameters GetDefaultBRDFPathTracingSeco
     params.spatialResamplingParams.numDisocclusionBoostSamples = 0; // Disabled
     params.spatialResamplingParams.depthThreshold = 0.1f;
     params.spatialResamplingParams.normalThreshold = 0.9f;
+    params.spatialResamplingParams.neighborOffsetSamplingMode = rtxdi::GetDefaultReSTIRDISpatialResamplingParams().neighborOffsetSamplingMode;
 
     return params;
 }
@@ -115,6 +116,7 @@ PTParameters GetDefaultPTParameters()
     params.nee.spatialResamplingParams.discountNaiveSamples = false;
     params.nee.spatialResamplingParams.enableMaterialSimilarityTest = true;
     params.nee.spatialResamplingParams.targetHistoryLength = 0;
+    params.nee.spatialResamplingParams.neighborOffsetSamplingMode = rtxdi::GetDefaultReSTIRDISpatialResamplingParams().neighborOffsetSamplingMode;
 
     return params;
 }
@@ -194,6 +196,7 @@ LightingPasses::LightingPasses(
         nvrhi::BindingLayoutItem::Texture_SRV(23),
         nvrhi::BindingLayoutItem::Texture_SRV(24),
         nvrhi::BindingLayoutItem::StructuredBuffer_SRV(25),
+        nvrhi::BindingLayoutItem::TypedBuffer_SRV(26),
 
         nvrhi::BindingLayoutItem::StructuredBuffer_UAV(0),
         nvrhi::BindingLayoutItem::Texture_UAV(1),
@@ -296,6 +299,7 @@ void LightingPasses::CreateBindingSet(
             nvrhi::BindingSetItem::Texture_SRV(23, resources.EnvironmentPdfTexture),
             nvrhi::BindingSetItem::Texture_SRV(24, resources.LocalLightPdfTexture),
             nvrhi::BindingSetItem::StructuredBuffer_SRV(25, resources.GeometryInstanceToLightBuffer),
+            nvrhi::BindingSetItem::TypedBuffer_SRV(26, resources.DINeighborOffsetsBuffer),
 
             nvrhi::BindingSetItem::StructuredBuffer_UAV(0, resources.DIReservoirBuffer),
             nvrhi::BindingSetItem::Texture_UAV(1, renderTargets.DiffuseLighting),
@@ -491,7 +495,6 @@ void FillReSTIRDIConstants(RTXDI_Parameters& params, const rtxdi::ReSTIRDIContex
     params.temporalResamplingParams = restirDIContext.GetTemporalResamplingParameters();
     params.boilingFilterParams = restirDIContext.GetBoilingFilterParameters();
     params.spatialResamplingParams = restirDIContext.GetSpatialResamplingParameters();
-    params.spatioTemporalResamplingParams = restirDIContext.GetSpatioTemporalResamplingParameters();
     params.shadingParams = restirDIContext.GetShadingParameters();
 }
 

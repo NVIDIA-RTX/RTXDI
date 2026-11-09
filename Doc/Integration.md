@@ -31,6 +31,8 @@ The application also needs to provide shader-side and host-side functionality fo
 
 For additional considerations about the necessary passes and functions, and to learn more about noise and bias reduction, see the [Noise and Bias Guide](NoiseAndBias.md).
 
+For inspecting stored DI, GI, and PT reservoir fields, the Full Sample provides [reservoir subfield visualizations](DebugUtilities.md#reservoir-subfield-display), available in the Debug dropdown menu.
+
 
 ## Frame rendering sequence
 
@@ -48,11 +50,11 @@ The following resources are used by RTXDI sampling and resampling functions, eit
 
 - *Light data buffer*: stores information about all lights in the scene. See the [next section](#lightbuffer) to learn more about this buffer.
 - *Light index mapping buffer*: stores the mapping of light indices from the previous frame to the current frame and the other way around.
-- *Neighbor offset buffer*: stores random pixel offsets for spatial resampling. Initialize using `rtxdi::FillNeighborOffsetBuffer` at creation.
+- *Neighbor offset buffer*: an `RG8_SNORM` buffer of pixel offsets used for spatial resampling. Initialize it with `rtxdi::FillNeighborOffsetBuffer` using the selected sampling mode; see the [shader API](ShaderAPI.md#rtxdi_di_neighbor_offsets_buffer) for binding details.
 - *PDF (Probability Density Function) textures*: these textures store the probability for each light or each environment map pixel being sampled. See the [PDF texture section](#pdf-textures) for more information.
 - *RIS (Resampled Importance Sampling) buffer*: stores results of pre-sampling passes. Each element of the RIS buffer is a `uint2` where the `.x` component stores the light index, and the `.y` component stores the inverse of its selection PDF.
 - *RIS light data buffer*: stores information about the lights in each element of the RIS buffer. This buffer is optional and its only purpose is to improve performance by making memory accesses more local in the initial sampling pass.
-- *Reservoir buffer*: contains several screen-sized arrays storing one `RTXDI_PackedDIReservoir` structure per pixel each. The number of these arrays is determined by the complexity of the application's resampling pipeline, and the number of final samples per pixel. For a simple use case when the application is doing spatiotemporal resampling with one spatial pass and one sample per pixel, two arrays are sufficient. To compute the array size, use the `rtxdi::ReSTIRDIContext::getReservoirBufferParameters().reservoirArrayPitch` field and not just the product of screen width and height, because the pixels are stored in the buffer in a block-linear layout.
+- *Reservoir buffer*: contains several screen-sized arrays storing one `RTXDI_PackedDIReservoir` structure per pixel each. When using `rtxdi::ReSTIRDIContext`, allocate `rtxdi::c_NumReSTIRDIReservoirBuffers` arrays and use the indices returned by `GetBufferIndices()` for each pass. To compute the array size, use the `GetReservoirBufferParameters().reservoirArrayPitch` field and not just the product of screen width and height, because the pixels are stored in the buffer in a block-linear layout.
 
 These buffers are created by the sample application but are not used by RTXDI, they are only necessary to prepare the light buffer:
 
@@ -107,7 +109,7 @@ Build the world-space light sampling structure for [ReGIR](#regir) (Reservoir-ba
 
 ### 7. Perform light sampling and resampling
 
-Perform light sampling and resampling in screen space using shaders that call the following functions: [`RTXDI_SampleLightsForSurface`](ShaderAPI.md#rtxdi_samplelightsforsurface), [`RTXDI_DITemporalResampling`](ShaderAPI.md#rtxdi_ditemporalresampling), [`RTXDI_DISpatialResampling`](ShaderAPI.md#rtxdi_dispatialresampling), [`RTXDI_DISpatioTemporalResampling`](ShaderAPI.md#rtxdi_dispatiotemporalresampling). See e.g. [`GenerateInitialSamples.hlsl`](../Samples/FullSample/Shaders/LightingPasses/DI/GenerateInitialSamples.hlsl) for a shader example, and [`LightingPasses.cpp`](../Samples/FullSample/Source/RenderPasses/LightingPasses.cpp) for host-side code example. Examples of resampled pipelines are provided [below](#examples).
+Perform light sampling and resampling in screen space using shaders that call the following functions: [`RTXDI_SampleLightsForSurface`](ShaderAPI.md#rtxdi_samplelightsforsurface), [`RTXDI_DITemporalResampling`](ShaderAPI.md#rtxdi_ditemporalresampling), and [`RTXDI_DISpatialResampling`](ShaderAPI.md#rtxdi_dispatialresampling). See e.g. [`GenerateInitialSamples.hlsl`](../Samples/FullSample/Shaders/LightingPasses/DI/GenerateInitialSamples.hlsl) for a shader example, and [`ReSTIRDIRenderPasses.cpp`](../Samples/FullSample/Source/RenderPasses/LightingPasses/ReSTIRDIRenderPasses.cpp) for host-side code. Examples of resampled pipelines are provided [below](#examples).
 
 ### 8. Shade
 
@@ -126,10 +128,6 @@ Apply denoising and composite the denoised lighting with other effects.
 The resampling functions can be assembled into various pipelines to fit the application's needs. A complete resampling pipeline with two spatial passes is shown on the image below. The sample application uses a pipeline like this, except with one spatial pass instead of two.
 
 ![Separated Pipeline](Images/PipelineSeparated.png)
-
-Some applications might find it useful to implement a fused resampling pipeline, one that combines all light sampling passes into one shader, which could be also tracing primary rays. Such fused pipeline is shown below.
-
-![Fused Pipeline](Images/PipelineFused.png)
 
 ## <a name="meshlight"></a>Mesh light processing
 

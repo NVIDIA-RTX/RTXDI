@@ -27,3 +27,7 @@ The Intermediate Buffer Visualization menu in the GUI allows users to visualize 
 - Intermediate Texture Display blits the selected buffer directly to the screen. The list includes GBuffer layers and their PSR counterparts, as well as lighting components such as direct and indirect illumination.
 - Reservoir Subfield Display sends the chosen field of the selected reservoir type to the screen, transforming some values to help in visualization.
 - NRD Validation blits the NRD validation texture to the screen, with the option of overlaying it on top of the regularly rendered output.
+
+### Reservoir subfield display
+
+Select **Intermediate Buffer Visualization > Reservoir Subfield Display**, choose DI, GI, or PT, and then choose a subfield. **Values** visualized the field values, and **Status** shows whether a given field is valid and if not, the nature of the invalidity. Counts for each status category are displayed as well.
