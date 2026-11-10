@@ -449,7 +449,7 @@ struct RTXDI_TemporalResamplingParameters
 };
 
 #if RTXDI_TEMPORAL_SELECTION_PASS
-bool RTXDI_IsActiveTemporalNeighbor(
+bool RTXDI_LoadCompatibleTemporalNeighborSurface(
     int2 pixel,
     RAB_Surface surface,
     RTXDI_TemporalResamplingParameters tparams,
@@ -457,7 +457,7 @@ bool RTXDI_IsActiveTemporalNeighbor(
     uint globalIndex = ~0u)
 {
   previousSurface = RAB_EmptySurface();
-  if (!RAB_IsPreviousReservoirPixelActive(pixel, tparams.sourceBufferIndex, globalIndex))
+  if (!RAB_IsPreviousPixelActive(pixel, tparams.sourceBufferIndex, globalIndex))
   {
     return false;
   }
@@ -503,7 +503,7 @@ int2 RTXDI_SelectActiveTemporalNeighbor(
   }
 
   RAB_Surface previousSurface;
-  if (RTXDI_IsActiveTemporalNeighbor(centerPixel, surface, tparams, previousSurface))
+  if (RTXDI_LoadCompatibleTemporalNeighborSurface(centerPixel, surface, tparams, previousSurface))
   {
     previousNormal = RAB_GetSurfaceNormal(previousSurface);
     return centerPixel;
@@ -522,7 +522,7 @@ int2 RTXDI_SelectActiveTemporalNeighbor(
   {
     uint candidateGlobalIndex;
     const int2 candidatePixel = RAB_GetActiveNeighborCandidate(centerPixel, true, searchRadius, rng, candidateGlobalIndex);
-    if (!RTXDI_IsActiveTemporalNeighbor(candidatePixel, surface, tparams, previousSurface, candidateGlobalIndex))
+    if (!RTXDI_LoadCompatibleTemporalNeighborSurface(candidatePixel, surface, tparams, previousSurface, candidateGlobalIndex))
     {
       continue;
     }
@@ -1675,7 +1675,7 @@ void RTXDI_FindGradientSampleAndBestLight(
     if (any(srcPixelPos >= int2(resolution)))
       continue;
 
-    if (!RAB_IsReservoirPixelActive(srcPixelPos, reservoirBufferIndex, false))
+    if (!RAB_IsReservoirAvailable(srcPixelPos, reservoirBufferIndex))
     {
       continue;
     }
