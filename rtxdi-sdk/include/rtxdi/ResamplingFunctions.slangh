@@ -29,10 +29,6 @@
 #define RTXDI_NO_PORTALS 0
 #endif
 
-#ifndef RTXDI_MAX_ACTIVE_NEIGHBORS
-#define RTXDI_MAX_ACTIVE_NEIGHBORS 4
-#endif
-
 bool RTXDI_StreamSample(
   inout RTXDI_Reservoir reservoir,
   uint lightIndex,
@@ -805,14 +801,7 @@ float2 RTXDI_GetSpatialNeighborOffset(inout RAB_RandomSamplerState rng)
 
 uint RTXDI_GetSelectedActiveNeighbor(uint selectedPixels[RTXDI_MAX_ACTIVE_NEIGHBORS], uint index)
 {
-  switch (index)
-  {
-    case 0: return selectedPixels[0];
-    case 1: return selectedPixels[1];
-    case 2: return selectedPixels[2];
-    case 3: return selectedPixels[3];
-    default: return ~0u;
-  }
+  return index < RTXDI_MAX_ACTIVE_NEIGHBORS ? selectedPixels[index] : ~0u;
 }
 
 #if RTXDI_SPATIAL_SELECTION_PASS
