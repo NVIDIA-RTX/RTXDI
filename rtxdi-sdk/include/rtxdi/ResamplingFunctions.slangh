@@ -382,6 +382,7 @@ float RTXDI_GetNeighborCompatibilityScore(
   const float normalDot = max(0.0, dot(centerNormal, RAB_GetSurfaceNormal(neighborSurface)));
   const float normalDot2 = normalDot * normalDot;
   const float normalDot4 = normalDot2 * normalDot2;
+  // CGNS Normal similarity exponent beta = 8 
   const float normalSimilarity = normalDot4 * normalDot4;
   const float neighborDepth = max(RAB_GetSurfaceLinearDepth(neighborSurface), 0.0);
   const float3 neighborRay = neighborBasis.ray + float3(neighborBasis.pixelStep * float2(pixelOffset), 0.0);
@@ -479,7 +480,6 @@ bool RTXDI_LoadCompatibleTemporalNeighborSurface(
 }
 
 int2 RTXDI_SelectActiveTemporalNeighbor(
-    uint2 pixelPosition,
     RAB_Surface surface,
     inout RAB_RandomSamplerState rng,
     RTXDI_TemporalResamplingParameters tparams,
@@ -507,6 +507,7 @@ int2 RTXDI_SelectActiveTemporalNeighbor(
 
   const float3 centerNormal = RAB_GetSurfaceNormal(surface);
   const float centerDepth = max(tparams.expectedPrevHitDistance, 0.0);
+  // CGNS angular bandwidth Omega for spatial proximity: exp(-|x-y|/s) where s = sqrt(Omega*centerDepth^2/pi)
   const float inversePositionSigma = rcp(max(centerDepth * sqrt(0.05 / pi), 1e-6));
   const RAB_NeighborBasis neighborBasis = RAB_InitNeighborBasis(tparams.prevPixelCenter, true, centerDepth * inversePositionSigma);
   const uint candidateCount = max(searchParams.temporalCandidateCount, 1u);
@@ -537,6 +538,7 @@ int2 RTXDI_SelectActiveTemporalNeighbor(
       previousNormal = RAB_GetSurfaceNormal(previousSurface);
     }
 
+    // CGNS early stopping criteria: 0.5
     if (score >= 0.5)
     {
       break;
@@ -842,6 +844,7 @@ void RTXDI_SelectActiveSpatialNeighbors(
   const float searchRadius = max(searchParams.spatialSearchRadius, 0.0);
   const float3 centerNormal = RAB_GetSurfaceNormal(centerSurface);
   const float centerDepth = max(RAB_GetSurfaceLinearDepth(centerSurface), 0.0);
+  // CGNS angular bandwidth Omega for spatial proximity: exp(-|x-y|/s) where s = sqrt(Omega*centerDepth^2/pi)
   const float inversePositionSigma = rcp(max(centerDepth * sqrt(0.05 / pi), 1e-6));
   const RAB_NeighborBasis neighborBasis = RAB_InitNeighborBasis(int2(pixelPosition), false, centerDepth * inversePositionSigma);
   float weightSum = 0.0;
@@ -888,6 +891,7 @@ void RTXDI_SelectActiveSpatialNeighbors(
     RTXDI_UpdateSelectedActiveNeighbor(3, neighborCount, candidateGlobalIndex, score, weightSum, rng, selectedPixels[3]);
     RAB_SkipRandoms(rng, neighborCount);
 
+    // CGNS early stopping criteria: 0.5
     goodCandidateCount += score >= 0.5 ? 1u : 0u;
     if (goodCandidateCount >= neighborCount)
     {
